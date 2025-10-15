@@ -96,23 +96,23 @@ jobs:
 
       - name: Run Checkstyle Scripts
         run: |
-          .ci/scripts/vpp/checkstyle.sh
+          .github/scripts/checkstyle.sh
 
       - name: Run Test Checkstyle Scripts
         run: |
-          .ci/scripts/vpp/test_checkstyle.sh
+          .github/scripts/test_checkstyle.sh
 
       - name: Run API Checkstyle Scripts
         run: |
-          .ci/scripts/vpp/api_checkstyle.sh
+          .github/scripts/api_checkstyle.sh
 
       - name: Run Commit Message Checkstyle
         run: |
-          .ci/scripts/vpp/commitmsg.sh
+          .github/scripts/commitmsg.sh
 
       - name: Run Docs Spell
         run: |
-          .ci/scripts/vpp/docs_spell.sh
+          .github/scripts/docs_spell.sh
 
       - name: Archive Checkstyle Logs
         if: always()
