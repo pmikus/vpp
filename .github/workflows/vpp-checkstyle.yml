@@ -96,7 +96,7 @@ jobs:
 
       - name: Run Checkstyle Scripts
         run: |
-          .github/scripts/checkstyle.sh
+          $GITHUB_WORKSPACE/.github/scripts/checkstyle.sh
 
       - name: Run Test Checkstyle Scripts
         run: |
