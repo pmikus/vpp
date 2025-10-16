@@ -3,7 +3,8 @@ name: vpp-verify
 on:
   workflow_run:
     workflows: ["vpp-checkstyle"]
-    types: [completed]
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       branch:
@@ -111,11 +112,11 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: lfit/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
         with:
-          gerrit-refspec: ${{ github.event.inputs.GERRIT_REFSPEC }}
-          gerrit-project: ${{ github.event.inputs.GERRIT_PROJECT }}
+          gerrit-refspec: ${{ github.event.workflow_run.event.inputs.GERRIT_REFSPEC }}
+          gerrit-project: ${{ github.event.workflow_run.event.inputs.GERRIT_PROJECT }}
           gerrit-url: ${{ vars.GERRIT_URL }}
           delay: "30s"
-          ref: refs/heads/${{ github.event.inputs.GERRIT_BRANCH }}
+          ref: refs/heads/${{ github.event.workflow_run.event.inputs.GERRIT_BRANCH }}
 
       - name: VPP Build Test Merge
         uses: pmikus/vpp/.github/actions/vpp_build_test_merge@master
