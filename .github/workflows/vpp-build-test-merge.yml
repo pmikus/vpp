@@ -38,27 +38,17 @@ jobs:
       fail-fast: false
       matrix:
         os: ['ubuntu2404', 'ubuntu2204', 'debian12']
-        branch: [master, stable/2502, stable/2506]
         executor_arch: ['x86_64', 'aarch64']
         build_type: ${{ (inputs.build_type == 'debug' || github.event.inputs.build_type == 'debug') && fromJson('["debug"]') || (inputs.build_type == 'release' || github.event.inputs.build_type == 'release') && fromJson('["release"]') || fromJson('["debug", "release"]') }}
         exclude:
           # Exclude debian12 on aarch64 for all builds
           - os: 'debian12'
             executor_arch: 'aarch64'
-
-          # Debug build exclusions - only keep [master, ubuntu2204, x86_64]
-          # Exclude non-master branches for debug builds
-          - build_type: 'debug'
-            branch: 'stable/2502'
-          - build_type: 'debug'
-            branch: 'stable/2506'
-
           # Exclude non-ubuntu2204 OS for debug builds
           - build_type: 'debug'
             os: 'ubuntu2404'
           - build_type: 'debug'
             os: 'debian12'
-
           # Exclude aarch64 architecture for debug builds
           - build_type: 'debug'
             executor_arch: 'aarch64'
@@ -68,13 +58,12 @@ jobs:
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       DOCKER_TEST: 1
       EXECUTOR_ARCH: ${{ matrix.executor_arch }}
-      GERRIT_BRANCH: ${{ matrix.branch }}
-      JOB_NAME: ${{ github.job }}-${{ matrix.branch == 'master' && 'master' || matrix.branch == 'stable/2502' && '2502' || '2506' }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+      JOB_NAME: ${{ github.job }}-${{ env.GERRIT_BRANCH == 'master' && 'master' || env.GERRIT_BRANCH == 'stable/2502' && '2502' || '2506' }}-${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
       MAKE_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || matrix.os == 'ubuntu2404' && 'ubuntu-24.04' || 'debian-12' }}
       MAKE_TEST_MULTIWORKER_OS: 'debian-12'
       SHM_SIZE: ${{ matrix.executor_arch == 'aarch64' && '4096M' || '2048M' }}
-      STREAM: ${{ matrix.branch == 'master' && 'master' || matrix.branch == 'stable/2502' && '2502' || '2506' }}
+      STREAM: ${{ env.GERRIT_BRANCH == 'master' && 'master' || env.GERRIT_BRANCH == 'stable/2502' && '2502' || '2506' }}
       TEST_RETRIES: 3
       VPPAPIGEN_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || matrix.os == 'ubuntu2404' && 'ubuntu-24.04' || 'debian-12' }}
       VPP_SRC_DIR: /scratch/docker-build/vpp
@@ -114,9 +103,6 @@ jobs:
 
       - name: Setup Docker Environment
         run: |
-          #OS_ID=$(grep '^ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
-          #OS_VERSION_ID=$(grep '^VERSION_ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
-
           if [ -n ${DOCKER_TEST} ] ; then
             # for 4 cores:
             # framework.VppTestCase.MIN_REQ_SHM + (num_cores * framework.VppTestCase.SHM_PER_PROCESS)
