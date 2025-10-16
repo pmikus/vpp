@@ -3,35 +3,6 @@ description: |
   This GitHub Action <...>.
 
 inputs:
-  branch:
-    description: 'Branch to test'
-    required: false
-    default: 'master'
-    type: string
-  commit_sha:
-    description: 'Exact commit SHA to build/test/merge'
-    required: false
-    type: string
-  builder_type:
-    description: 'Builder image type (prod or sandbox)'
-    required: false
-    default: 'sandbox'
-    type: string
-  build_type:
-    description: 'Build type selection (debug, release, or both)'
-    required: false
-    default: 'both'
-    type: string
-  reason:
-    description: 'Reason for trigger'
-    required: false
-    default: 'Called from another workflow'
-    type: string
-  make_parallel_jobs:
-    description: 'MAKE_PARALLEL_JOBS value (number of parallel make jobs)'
-    required: false
-    default: '16'
-    type: string
   is_build:
     description: 'Run only build phase (no tests, no merge)'
     required: false
