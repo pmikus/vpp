@@ -57,14 +57,14 @@ runs:
     - name: Setup Docker Environment
       shell: bash
       run: |
-        .ci/scripts/vpp/setup_vpp_ubuntu_docker_test.sh
+        $GITHUB_WORKSPACE/.github/scripts/setup_vpp_ubuntu_docker_test.sh
 
     - name: Install VPP external dependencies
       shell: bash
       run: |
-        .ci/scripts/vpp/setup_vpp_ext_deps.sh
+        $GITHUB_WORKSPACE/.github/scripts/setup_vpp_ext_deps.sh
 
     - name: Build VPP
       shell: bash
       run: |
-        .ci/scripts/vpp/build.sh
+        $GITHUB_WORKSPACE/.github/scripts/build.sh
