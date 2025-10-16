@@ -100,6 +100,7 @@ jobs:
           BUILD_EXT_DIR="build/external"
           MATRIX_FILE="$BUILD_EXT_DIR/mlx_rdma_dpdk_matrix.txt"
           PKGS_DIR="$BUILD_EXT_DIR/packages"
+
           if git show --stat | grep -q "$MATRIX_FILE" ; then
               RDMA_CORE_VERSION="$(grep rdma-core_version $PKGS_DIR/rdma-core.mk | grep -v '(' | mawk '{print $3}')"
               DPDK_VERSION="$(grep dpdk_version $PKGS_DIR/dpdk.mk | grep -v '(' | mawk '{print $3}')"
@@ -121,7 +122,7 @@ jobs:
 
       - name: Run Test Checkstyle Scripts
         run: |
-          if [ -n "$(grep -E '^test-checkstyle:' Makefile)" ]
+          if grep -qE '^test-checkstyle:' Makefile
           then
               make test-checkstyle
           else
