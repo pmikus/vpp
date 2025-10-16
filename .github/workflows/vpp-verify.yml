@@ -6,11 +6,14 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+
 jobs:
-  merge-vpp:
-    name: Build & Merge VPP
+  verify-build-test:
+    name: Build & Test VPP
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    uses: ./vpp-build-test-merge.yml
+    uses: ./.github/workflows/vpp-build-test-merge.yml
     with:
       is_merge: false
     secrets: inherit

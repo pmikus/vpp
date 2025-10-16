@@ -62,11 +62,6 @@ jobs:
           # Exclude aarch64 architecture for debug builds
           - build_type: 'debug'
             executor_arch: 'aarch64'
-    if: >-
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'workflow_call'
-      )
 
     env:
       CACHE_DATE: ${{ github.run_id }}
