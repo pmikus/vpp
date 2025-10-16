@@ -52,6 +52,7 @@ runs:
   using: "composite"
   steps:
     - name: Determine phase selection (Build/Test/Merge)
+      shell: bash
       run: |
         BUILD_INPUT='${{ inputs.is_build || github.event.inputs.is_build }}'
         TEST_INPUT='${{ inputs.is_verify || github.event.inputs.is_verify }}'
@@ -83,14 +84,17 @@ runs:
       uses: pmikus/.github/.github/actions/setup_executor_env@main
 
     - name: Setup Docker Environment
+      shell: bash
       run: |
         .ci/scripts/vpp/setup_vpp_ubuntu_docker_test.sh
 
     - name: Install VPP external dependencies
+      shell: bash
       run: |
         .ci/scripts/vpp/setup_vpp_ext_deps.sh
 
     - name: Build VPP
       timeout-minutes: 60
+      shell: bash
       run: |
         .ci/scripts/vpp/build.sh
