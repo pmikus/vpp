@@ -94,7 +94,6 @@ runs:
         .ci/scripts/vpp/setup_vpp_ext_deps.sh
 
     - name: Build VPP
-      timeout-minutes: 60
       shell: bash
       run: |
         .ci/scripts/vpp/build.sh
