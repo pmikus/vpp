@@ -16,4 +16,5 @@ jobs:
     uses: ./.github/workflows/vpp-build-test-merge.yml
     with:
       is_merge: false
+      branch: ${{ github.event.workflow_run.outputs.branch }}
     secrets: inherit
