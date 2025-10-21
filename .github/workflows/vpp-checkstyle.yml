@@ -41,6 +41,14 @@ on:
         required: true
         type: string
 
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   # yamllint disable-line rule:line-length
   group: required-verify-${{ github.workflow }}-${{ github.event.inputs.GERRIT_BRANCH }}-${{ github.event.inputs.GERRIT_CHANGE_ID || github.run_id }}
@@ -80,13 +88,31 @@ jobs:
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
-      - name: Set Branch
-        id: set-branch
+      - name: Set Gerrit Environment Variables
+        id: set-gerrit-vars
         run: |
-          echo "branch=$GERRIT_BRANCH" >> $GITHUB_OUTPUT
+          set -euxo pipefail
+          {
+            echo "branch=${{ inputs.GERRIT_BRANCH }}"
+            echo "refspec=${{ inputs.GERRIT_REFSPEC }}"
+            echo "url=${{ inputs.GERRIT_URL }}"
+          } >> $GITHUB_OUTPUT
+
+          # Create workflow outputs for downstream workflows
+          mkdir -p workflow-outputs
+          echo "${{ inputs.GERRIT_BRANCH }}" > workflow-outputs/branch
+          echo "${{ inputs.GERRIT_REFSPEC }}" > workflow-outputs/refspec
+          echo "${{ inputs.GERRIT_CHANGE_URL }}" > workflow-outputs/url
+
+      - name: Upload Workflow Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-outputs-${{ matrix.os }}-${{ matrix.executor_arch }}
+          path: workflow-outputs/
 
       - name: Run Checkstyle Scripts
         run: |
+          set -euxo pipefail
           LINE="*******************************************************************"
           BUILD_EXT_DIR="build/external"
           MATRIX_FILE="$BUILD_EXT_DIR/mlx_rdma_dpdk_matrix.txt"
@@ -113,6 +139,7 @@ jobs:
 
       - name: Run Test Checkstyle Scripts
         run: |
+          set -euxo pipefail
           if grep -qE '^test-checkstyle:' Makefile
           then
               make test-checkstyle
@@ -122,6 +149,7 @@ jobs:
 
       - name: Run API Checkstyle Scripts
         run: |
+          set -euxo pipefail
           VPP_CRC_CHECKER="extras/scripts/crcchecker.py"
           VPP_CRC_CHECKER_CMD="$VPP_CRC_CHECKER --check-patchset"
 
@@ -144,6 +172,7 @@ jobs:
 
       - name: Run Commit Message Checkstyle
         run: |
+          set -euxo pipefail
           if [ -f extras/scripts/check_commit_msg.sh ] ; then
               echo "Running extras/scripts/check_commit_msg.sh"
               extras/scripts/check_commit_msg.sh
@@ -153,6 +182,7 @@ jobs:
 
       - name: Run Docs Spell
         run: |
+          set -euxo pipefail
           if grep -qE '^docs\-%' Makefile && grep -qE '^spell' docs/Makefile
           then
               make docs-spell
@@ -164,11 +194,72 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkstyle-logs-${{ steps.set-branch.outputs.branch }}-${{ matrix.os }}
+          name: checkstyle-logs-${{ steps.set-gerrit-vars.outputs.branch }}-${{ matrix.os }}
           path: logs/
 
       - name: Report Success
         if: success()
         run: |
-          echo "Checkstyle passed for ${{ steps.set-branch.outputs.branch }} on ${{ matrix.os }}"
-          echo "::notice::Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Repository: ${{ github.repository }}, Branch: ${{ steps.set-branch.outputs.branch }}"
+          echo "Checkstyle passed for ${{ steps.set-gerrit-vars.outputs.branch }} on ${{ matrix.os }}"
+          echo "::notice::Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Repository: ${{ github.repository }}, Branch: ${{ steps.set-gerrit-vars.outputs.branch }}"
+
+  consolidate-outputs:
+    name: Consolidate Workflow Outputs
+    needs: checkstyle
+    runs-on: ubuntu-latest
+    if: always()  # Run even if checkstyle job has failures, as long as artifacts were uploaded
+    steps:
+      - name: Download Matrix Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: workflow-outputs-*
+          merge-multiple: true
+
+      - name: Debug Downloaded Artifacts
+        run: |
+          set -euxo pipefail
+          echo "=== Current directory contents ==="
+          ls -la
+          echo "=== Looking for workflow-outputs directory ==="
+          if [ -d "workflow-outputs" ]; then
+            echo "Found workflow-outputs directory:"
+            ls -la workflow-outputs/
+          else
+            echo "No workflow-outputs directory found"
+          fi
+          echo "=== Looking for individual files ==="
+          find . -name "branch" -o -name "refspec" -o -name "url" | head -10
+
+      - name: Create Unified Workflow Outputs
+        run: |
+          set -euxo pipefail
+          # All matrix jobs create identical outputs, so we can use any one
+          # Just ensure the directory structure is correct
+          if [ ! -d "workflow-outputs" ]; then
+            echo "No workflow-outputs directory found, checking for files..."
+            ls -la
+            # If files are in root, create directory structure
+            if [ -f "branch" ] && [ -f "refspec" ] && [ -f "url" ]; then
+              echo "Found files in root, creating workflow-outputs directory"
+              mkdir -p workflow-outputs
+              cp branch refspec url workflow-outputs/
+            else
+              echo "Error: Expected workflow output files not found"
+              echo "Available files:"
+              ls -la
+              exit 1
+            fi
+          fi
+
+          echo "Final workflow-outputs contents:"
+          ls -la workflow-outputs/
+          echo "=== File contents ==="
+          echo "branch: $(cat workflow-outputs/branch)"
+          echo "refspec: $(cat workflow-outputs/refspec)"
+          echo "url: $(cat workflow-outputs/url)"
+
+      - name: Upload Unified Workflow Outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-outputs
+          path: workflow-outputs/

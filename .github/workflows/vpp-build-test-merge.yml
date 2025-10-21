@@ -5,18 +5,8 @@ on:
   # Invocation from other workflows
   workflow_call:
     inputs:
-      is_build:
-        description: 'Run only build phase (no tests, no merge)'
-        required: false
-        default: false
-        type: boolean
-      is_verify:
-        description: 'Run build + test phases (skip merge)'
-        required: false
-        default: false
-        type: boolean
       is_merge:
-        description: 'Run build + merge phases (skip tests)'
+        description: 'Merge first, then run build + test phases'
         required: false
         default: false
         type: boolean
@@ -30,10 +20,22 @@ on:
         required: true
         default: 'master'
         type: string
+      url:
+        description: 'Gerrit change URL'
+        required: true
+        type: string
+      refspec:
+        description: 'Gerrit change refspec'
+        required: true
+        type: string
 
 defaults:
   run:
     shell: bash
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   vpp-verify:
@@ -80,39 +82,22 @@ jobs:
       WORKSPACE: ${{ github.workspace }}
 
     steps:
-      - name: Determine phase selection (Build/Test/Merge)
-        run: |
-          BUILD_INPUT='${{ inputs.is_build || github.event.inputs.is_build }}'
-          TEST_INPUT='${{ inputs.is_verify || github.event.inputs.is_verify }}'
-          MERGE_INPUT='${{ inputs.is_merge || github.event.inputs.is_merge }}'
-          RUN_TEST_PHASE=true
-          RUN_MERGE_PHASE=true
-          # Precedence: Build > Test > Merge (if multiple true)
-          if [[ "$BUILD_INPUT" == 'true' ]]; then
-            RUN_TEST_PHASE=false
-            RUN_MERGE_PHASE=false
-            PHASE_MODE='BUILD'
-          elif [[ "$TEST_INPUT" == 'true' ]]; then
-            RUN_TEST_PHASE=true
-            RUN_MERGE_PHASE=false
-            PHASE_MODE='TEST'
-          elif [[ "$MERGE_INPUT" == 'true' ]]; then
-            RUN_TEST_PHASE=false
-            RUN_MERGE_PHASE=true
-            PHASE_MODE='MERGE'
-          else
-            PHASE_MODE='FULL'
-          fi
-          echo "RUN_TEST_PHASE=${RUN_TEST_PHASE}" >> $GITHUB_ENV
-          echo "RUN_MERGE_PHASE=${RUN_MERGE_PHASE}" >> $GITHUB_ENV
-          echo "PHASE_MODE=${PHASE_MODE}" >> $GITHUB_ENV
-          echo "Selected phase mode: ${PHASE_MODE} (RUN_TEST_PHASE=${RUN_TEST_PHASE} RUN_MERGE_PHASE=${RUN_MERGE_PHASE})"
+      - name: Gerrit Checkout
+        # yamllint disable-line rule:line-length
+        uses: lfit/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+        with:
+          gerrit-refspec: ${{ inputs.refspec }}
+          gerrit-project: 'vpp'
+          gerrit-url: ${{ inputs.url }}
+          # delay: "30s"
+          ref: refs/heads/${{ inputs.branch }}
 
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
       - name: Setup Docker Environment
         run: |
+          set -euxo pipefail
           if [ -n ${DOCKER_TEST} ] ; then
             # for 4 cores:
             # framework.VppTestCase.MIN_REQ_SHM + (num_cores * framework.VppTestCase.SHM_PER_PROCESS)
@@ -128,9 +113,15 @@ jobs:
                   echo "/dev/shm remounted with size='${MEM}'"
           fi
 
+      - name: Maybe Merge Gerrit Change
+        if: ${{ inputs.is_merge == 'true' }}
+        run: |
+          set -euxo pipefail
+          echo "--- TBD: Merging change before build/test phases ---"
+
       - name: Install VPP external dependencies
         run: |
-          set -o pipefail
+          set -euxo pipefail
 
           SCRIPT_NAME="setup_vpp_ext_deps"
           START_TS=$(date +%s)
@@ -349,7 +340,7 @@ jobs:
           trap - EXIT
           exit 0
 
-      - name: Build VPP
+      - name: Verify VPP Build and Test
         timeout-minutes: 60
         run: |
           set -euxo pipefail
@@ -357,11 +348,11 @@ jobs:
           line="*************************************************************************"
           # Don't build anything if this is a merge job being run when
           # the git HEAD id is not the same as the Gerrit New Revision id.
-          if [[ ${JOB_NAME} == *merge* ]] && [ -n "${GERRIT_NEWREV:-}" ] &&
-                 [ "$GERRIT_NEWREV" != "$GIT_COMMIT" ] ; then
-              echo -e "\n$line\nSkipping build. A newer patch has been merged.\n$line\n"
-              exit 0
-          fi
+          #if [[ ${JOB_NAME} == *merge* ]] && [ -n "${GERRIT_NEWREV:-}" ] &&
+          #       [ "$GERRIT_NEWREV" != "$GIT_COMMIT" ] ; then
+          #    echo -e "\n$line\nSkipping build. A newer patch has been merged.\n$line\n"
+          #    exit 0
+          #fi
 
           OS_ID=$(grep '^ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
           OS_VERSION_ID=$(grep '^VERSION_ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
