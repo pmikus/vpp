@@ -77,7 +77,7 @@ jobs:
         with:
           gerrit-refspec: ${{ github.event.inputs.GERRIT_REFSPEC }}
           gerrit-project: ${{ github.event.inputs.GERRIT_PROJECT }}
-          gerrit-url: ${{ vars.GERRIT_URL }}
+          gerrit-url: ${{ github.event.inputs.GERRIT_CHANGE_URL }}
           delay: "30s"
           ref: refs/heads/${{ github.event.inputs.GERRIT_BRANCH }}
 
@@ -92,17 +92,13 @@ jobs:
         id: set-gerrit-vars
         run: |
           set -euxo pipefail
-          {
-            echo "branch=${{ inputs.GERRIT_BRANCH }}"
-            echo "refspec=${{ inputs.GERRIT_REFSPEC }}"
-            echo "url=${{ inputs.GERRIT_URL }}"
-          } >> $GITHUB_OUTPUT
+          echo "branch=${{ github.event.inputs.GERRIT_BRANCH }}" >> $GITHUB_OUTPUT
 
           # Create workflow outputs for downstream workflows
           mkdir -p workflow-outputs
-          echo "${{ inputs.GERRIT_BRANCH }}" > workflow-outputs/branch
-          echo "${{ inputs.GERRIT_REFSPEC }}" > workflow-outputs/refspec
-          echo "${{ inputs.GERRIT_CHANGE_URL }}" > workflow-outputs/url
+          echo "${{ github.event.inputs.GERRIT_BRANCH }}" > workflow-outputs/branch
+          echo "${{ github.event.inputs.GERRIT_REFSPEC }}" > workflow-outputs/refspec
+          echo "${{ github.event.inputs.GERRIT_CHANGE_URL }}" > workflow-outputs/url
 
       - name: Upload Workflow Outputs
         uses: actions/upload-artifact@v4
