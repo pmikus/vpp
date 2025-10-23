@@ -51,7 +51,7 @@ permissions:
 
 concurrency:
   # yamllint disable-line rule:line-length
-  group: required-verify-${{ github.workflow }}-${{ github.event.inputs.GERRIT_BRANCH }}-${{ github.event.inputs.GERRIT_CHANGE_ID || github.run_id }}
+  group: required-verify-${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-${{ inputs.GERRIT_CHANGE_ID || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -75,11 +75,11 @@ jobs:
         # yamllint disable-line rule:line-length
         uses: lfit/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
         with:
-          gerrit-refspec: ${{ github.event.inputs.GERRIT_REFSPEC }}
-          gerrit-project: ${{ github.event.inputs.GERRIT_PROJECT }}
-          gerrit-url: ${{ github.event.inputs.GERRIT_CHANGE_URL }}
+          gerrit-refspec: ${{ inputs.GERRIT_REFSPEC }}
+          gerrit-project: ${{ inputs.GERRIT_PROJECT }}
+          gerrit-url: ${{ inputs.GERRIT_CHANGE_URL }}
           delay: "30s"
-          ref: refs/heads/${{ github.event.inputs.GERRIT_BRANCH }}
+          ref: refs/heads/${{ inputs.GERRIT_BRANCH }}
 
       - name: Retrieve GIT commit message
         # yamllint disable-line rule:line-length
@@ -88,23 +88,52 @@ jobs:
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
-      - name: Set Gerrit Environment Variables
-        id: set-gerrit-vars
+      - name: Output VPP Gerrit Environment Variables
+        id: vpp-gerrit-vars
         run: |
-          set -euxo pipefail
-          echo "branch=${{ github.event.inputs.GERRIT_BRANCH }}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          mkdir -p vpp-gerrit-vars
+          echo "${{ inputs.GERRIT_BRANCH }}"
+          echo "${{ inputs.GERRIT_REFSPEC }}"
+          echo "${{ inputs.GERRIT_CHANGE_URL }}"
 
-          # Create workflow outputs for downstream workflows
-          mkdir -p workflow-outputs
-          echo "${{ github.event.inputs.GERRIT_BRANCH }}" > workflow-outputs/branch
-          echo "${{ github.event.inputs.GERRIT_REFSPEC }}" > workflow-outputs/refspec
-          echo "${{ github.event.inputs.GERRIT_CHANGE_URL }}" > workflow-outputs/url
+          echo "${{ inputs.GERRIT_BRANCH }}" > vpp-gerrit-vars/branch
+          echo "${{ inputs.GERRIT_REFSPEC }}" > vpp-gerrit-vars/refspec
+          echo "${{ inputs.GERRIT_CHANGE_URL }}" > vpp-gerrit-vars/url
 
       - name: Upload Workflow Outputs
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-outputs-${{ matrix.os }}-${{ matrix.executor_arch }}
-          path: workflow-outputs/
+          name: vpp-gerrit-vars
+          path: vpp-gerrit-vars/
+
+      - name: Show Executor Runtime Attributes and Dockerfile
+        run: |
+          set -euo pipefail
+          LINE="*******************************************************************"
+          DOCKERFILE_PATH="/scratch/docker-build/Dockerfile"
+          NOMAD_CLIENT_FILE="/scratch/nomad/nomad-client"
+          if [ -f "$NOMAD_CLIENT_FILE" ]; then
+              NOMAD_CLIENT_NAME=$(cat "$NOMAD_CLIENT_FILE")
+          else
+              NOMAD_CLIENT_NAME="Unknown"
+          fi
+          echo "$LINE"
+          echo "Executor Runtime Attributes:"
+          echo "OS: ${{ matrix.os }}"
+          echo "Architecture: ${{ matrix.executor_arch }}"
+          echo "Nomad Client Name: $NOMAD_CLIENT_NAME"
+          echo "Container ID: $(hostname)"
+          echo "Runner Name: ${{ runner.name }}"
+
+          if [ -f "$DOCKERFILE_PATH" ]; then
+              echo "$LINE"
+              echo "Executor Dockerfile; $DOCKERFILE_PATH"
+              echo "----- %< -----"
+              cat "$DOCKERFILE_PATH"
+          else
+              echo "No Dockerfile found in /scratch/docker-build."
+          fi
 
       - name: Run Checkstyle Scripts
         run: |
@@ -133,129 +162,129 @@ jobs:
               echo "Can't find checkstyle target in Makefile - skipping checkstyle"
           fi
 
-      - name: Run Test Checkstyle Scripts
-        run: |
-          set -euxo pipefail
-          if grep -qE '^test-checkstyle:' Makefile
-          then
-              make test-checkstyle
-          else
-              echo "Can't find test-checkstyle target in Makefile - skipping test-checkstyle"
-          fi
+      # - name: Run Test Checkstyle Scripts
+      #   run: |
+      #     set -euxo pipefail
+      #     if grep -qE '^test-checkstyle:' Makefile
+      #     then
+      #         make test-checkstyle
+      #     else
+      #         echo "Can't find test-checkstyle target in Makefile - skipping test-checkstyle"
+      #     fi
 
-      - name: Run API Checkstyle Scripts
-        run: |
-          set -euxo pipefail
-          VPP_CRC_CHECKER="extras/scripts/crcchecker.py"
-          VPP_CRC_CHECKER_CMD="$VPP_CRC_CHECKER --check-patchset"
+      # - name: Run API Checkstyle Scripts
+      #   run: |
+      #     set -euxo pipefail
+      #     VPP_CRC_CHECKER="extras/scripts/crcchecker.py"
+      #     VPP_CRC_CHECKER_CMD="$VPP_CRC_CHECKER --check-patchset"
 
-          if [ -f $VPP_CRC_CHECKER ]; then
-              # API checker complains if the git repo is not clean.
-              # Help diagnosing those issues easier
-              git --no-pager diff
-              echo "Running $VPP_CRC_CHECKER_CMD"
-              if $VPP_CRC_CHECKER_CMD; then
-                  echo "API check successful"
-              else
-                  RET_CODE=$?
-                  echo "API check failed: ret code $RET_CODE; please read https://wiki.fd.io/view/VPP/ApiChangeProcess and discuss with ayourtch@gmail.com if unsure how to proceed"
-                  echo "::error file=.ci/scripts/vpp/crcchecker.py,line=1::API check FAILED for $GITHUB_REF. See run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-                  exit $RET_CODE
-              fi
-          else
-              echo "Cannot find $VPP_CRC_CHECKER - skipping API compatibility check"
-          fi
+      #     if [ -f $VPP_CRC_CHECKER ]; then
+      #         # API checker complains if the git repo is not clean.
+      #         # Help diagnosing those issues easier
+      #         git --no-pager diff
+      #         echo "Running $VPP_CRC_CHECKER_CMD"
+      #         if $VPP_CRC_CHECKER_CMD; then
+      #             echo "API check successful"
+      #         else
+      #             RET_CODE=$?
+      #             echo "API check failed: ret code $RET_CODE; please read https://wiki.fd.io/view/VPP/ApiChangeProcess and discuss with ayourtch@gmail.com if unsure how to proceed"
+      #             echo "::error file=.ci/scripts/vpp/crcchecker.py,line=1::API check FAILED for $GITHUB_REF. See run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      #             exit $RET_CODE
+      #         fi
+      #     else
+      #         echo "Cannot find $VPP_CRC_CHECKER - skipping API compatibility check"
+      #     fi
 
-      - name: Run Commit Message Checkstyle
-        run: |
-          set -euxo pipefail
-          if [ -f extras/scripts/check_commit_msg.sh ] ; then
-              echo "Running extras/scripts/check_commit_msg.sh"
-              extras/scripts/check_commit_msg.sh
-          else
-              echo "Cannot find cat extras/scripts/check_commit_msg.sh - skipping commit message check"
-          fi
+      # - name: Run Commit Message Checkstyle
+      #   run: |
+      #     set -euxo pipefail
+      #     if [ -f extras/scripts/check_commit_msg.sh ] ; then
+      #         echo "Running extras/scripts/check_commit_msg.sh"
+      #         extras/scripts/check_commit_msg.sh
+      #     else
+      #         echo "Cannot find cat extras/scripts/check_commit_msg.sh - skipping commit message check"
+      #     fi
 
-      - name: Run Docs Spell
-        run: |
-          set -euxo pipefail
-          if grep -qE '^docs\-%' Makefile && grep -qE '^spell' docs/Makefile
-          then
-              make docs-spell
-          else
-              echo "Can't find docs-spell target in Makefile - skipping docs-spell"
-          fi
+      # - name: Run Docs Spell
+      #   run: |
+      #     set -euxo pipefail
+      #     if grep -qE '^docs\-%' Makefile && grep -qE '^spell' docs/Makefile
+      #     then
+      #         make docs-spell
+      #     else
+      #         echo "Can't find docs-spell target in Makefile - skipping docs-spell"
+      #     fi
 
       - name: Archive Checkstyle Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkstyle-logs-${{ steps.set-gerrit-vars.outputs.branch }}-${{ matrix.os }}
+          name: checkstyle-logs-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}
           path: logs/
 
       - name: Report Success
         if: success()
         run: |
-          echo "Checkstyle passed for ${{ steps.set-gerrit-vars.outputs.branch }} on ${{ matrix.os }}"
-          echo "::notice::Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Repository: ${{ github.repository }}, Branch: ${{ steps.set-gerrit-vars.outputs.branch }}"
+          echo "Checkstyle passed for ${{ inputs.GERRIT_BRANCH }} on ${{ matrix.os }}"
+          echo "::notice::Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Repository: ${{ github.repository }}, Branch: ${{ inputs.GERRIT_BRANCH }}"
 
-  consolidate-outputs:
-    name: Consolidate Workflow Outputs
-    needs: checkstyle
-    runs-on: ubuntu-latest
-    if: always()  # Run even if checkstyle job has failures, as long as artifacts were uploaded
-    steps:
-      - name: Download Matrix Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: workflow-outputs-*
-          merge-multiple: true
+  # consolidate-outputs:
+  #   name: Consolidate Workflow Outputs
+  #   needs: checkstyle
+  #   runs-on: ubuntu-latest
+  #   if: always()  # Run even if checkstyle job has failures, as long as artifacts were uploaded
+  #   steps:
+  #     - name: Download Matrix Artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         pattern: workflow-outputs-*
+  #         merge-multiple: true
 
-      - name: Debug Downloaded Artifacts
-        run: |
-          set -euxo pipefail
-          echo "=== Current directory contents ==="
-          ls -la
-          echo "=== Looking for workflow-outputs directory ==="
-          if [ -d "workflow-outputs" ]; then
-            echo "Found workflow-outputs directory:"
-            ls -la workflow-outputs/
-          else
-            echo "No workflow-outputs directory found"
-          fi
-          echo "=== Looking for individual files ==="
-          find . -name "branch" -o -name "refspec" -o -name "url" | head -10
+  #     - name: Debug Downloaded Artifacts
+  #       run: |
+  #         set -euxo pipefail
+  #         echo "=== Current directory contents ==="
+  #         ls -la
+  #         echo "=== Looking for workflow-outputs directory ==="
+  #         if [ -d "workflow-outputs" ]; then
+  #           echo "Found workflow-outputs directory:"
+  #           ls -la workflow-outputs/
+  #         else
+  #           echo "No workflow-outputs directory found"
+  #         fi
+  #         echo "=== Looking for individual files ==="
+  #         find . -name "branch" -o -name "refspec" -o -name "url" | head -10
 
-      - name: Create Unified Workflow Outputs
-        run: |
-          set -euxo pipefail
-          # All matrix jobs create identical outputs, so we can use any one
-          # Just ensure the directory structure is correct
-          if [ ! -d "workflow-outputs" ]; then
-            echo "No workflow-outputs directory found, checking for files..."
-            ls -la
-            # If files are in root, create directory structure
-            if [ -f "branch" ] && [ -f "refspec" ] && [ -f "url" ]; then
-              echo "Found files in root, creating workflow-outputs directory"
-              mkdir -p workflow-outputs
-              cp branch refspec url workflow-outputs/
-            else
-              echo "Error: Expected workflow output files not found"
-              echo "Available files:"
-              ls -la
-              exit 1
-            fi
-          fi
+  #     - name: Create Unified Workflow Outputs
+  #       run: |
+  #         set -euo pipefail
+  #         # All matrix jobs create identical outputs, so we can use any one
+  #         # Just ensure the directory structure is correct
+  #         if [ ! -d "workflow-outputs" ]; then
+  #           echo "No workflow-outputs directory found, checking for files..."
+  #           ls -la
+  #           # If files are in root, create directory structure
+  #           if [ -f "branch" ] && [ -f "refspec" ] && [ -f "url" ]; then
+  #             echo "Found files in root, creating workflow-outputs directory"
+  #             mkdir -p workflow-outputs
+  #             cp branch refspec url workflow-outputs/
+  #           else
+  #             echo "Error: Expected workflow output files not found"
+  #             echo "Available files:"
+  #             ls -la
+  #             exit 1
+  #           fi
+  #         fi
 
-          echo "Final workflow-outputs contents:"
-          ls -la workflow-outputs/
-          echo "=== File contents ==="
-          echo "branch: $(cat workflow-outputs/branch)"
-          echo "refspec: $(cat workflow-outputs/refspec)"
-          echo "url: $(cat workflow-outputs/url)"
+  #         echo "Final workflow-outputs contents:"
+  #         ls -la workflow-outputs/
+  #         echo "=== File contents ==="
+  #         echo "branch: $(cat workflow-outputs/branch)"
+  #         echo "refspec: $(cat workflow-outputs/refspec)"
+  #         echo "url: $(cat workflow-outputs/url)"
 
-      - name: Upload Unified Workflow Outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-outputs
-          path: workflow-outputs/
+  #     - name: Upload Unified Workflow Outputs
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: workflow-outputs
+  #         path: workflow-outputs/

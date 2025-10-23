@@ -15,19 +15,19 @@ permissions:
   actions: read
 
 jobs:
-  get-workflow-data:
-    name: Get Workflow Data
+  get-vpp-gerrit-vars:
+    name: Get VPP Gerrit Environment Variables
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     outputs:
-      branch: ${{ steps.read-outputs.outputs.branch }}
-      refspec: ${{ steps.read-outputs.outputs.refspec }}
-      url: ${{ steps.read-outputs.outputs.url }}
+      branch: ${{ steps.read-vpp-gerrit-vars.outputs.branch }}
+      refspec: ${{ steps.read-vpp-gerrit-vars.outputs.refspec }}
+      url: ${{ steps.read-vpp-gerrit-vars.outputs.url }}
     steps:
-      - name: Download Workflow Artifacts via GitHub API
+      - name: Download vpp-gerrit-vars Artifacts
         id: download-artifact
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           # Get the artifact download URL
           ARTIFACTS_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts"
 
@@ -43,23 +43,14 @@ jobs:
           echo "=== All artifacts in this workflow run ==="
           echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[] | "\(.name) (ID: \(.id), expired: \(.expired))"' || echo "No artifacts or jq error"
 
-          # Find the workflow-outputs artifact
-          ARTIFACT_ID=$(echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[] | select(.name=="workflow-outputs") | .id')
+          # Find the vpp-gerrit-vars artifact
+          ARTIFACT_ID=$(echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[] | select(.name=="vpp-gerrit-vars") | .id')
 
           if [ "$ARTIFACT_ID" = "null" ] || [ -z "$ARTIFACT_ID" ]; then
-            echo "Error: workflow-outputs artifact not found"
+            echo "Error: vpp-gerrit-vars artifact not found"
             echo "Available artifacts:"
             echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[].name' || echo "Failed to parse artifacts"
-
-            # Try to find any workflow-outputs-* artifacts as fallback
-            MATRIX_ARTIFACT_ID=$(echo "$ARTIFACTS_RESPONSE" | jq -r '.artifacts[] | select(.name | startswith("workflow-outputs-")) | .id' | head -1)
-            if [ -n "$MATRIX_ARTIFACT_ID" ] && [ "$MATRIX_ARTIFACT_ID" != "null" ]; then
-              echo "Found matrix artifact instead, using: $MATRIX_ARTIFACT_ID"
-              ARTIFACT_ID="$MATRIX_ARTIFACT_ID"
-            else
-              echo "No suitable artifacts found"
-              exit 1
-            fi
+            exit 1
           fi
 
           echo "Using artifact ID: $ARTIFACT_ID"
@@ -75,17 +66,12 @@ jobs:
           echo "=== Extracted contents ==="
           ls -la
 
-      - name: Read Outputs
-        id: read-outputs
+      - name: Read VPP Gerrit Environment Variables
+        id: read-vpp-gerrit-vars
         run: |
-          set -euxo pipefail
-          # Check if files are in workflow-outputs subdirectory first
-          if [ -f "workflow-outputs/branch" ]; then
-            echo "Found files in workflow-outputs directory"
-            BRANCH_FILE="workflow-outputs/branch"
-            REFSPEC_FILE="workflow-outputs/refspec"
-            URL_FILE="workflow-outputs/url"
-          elif [ -f "branch" ]; then
+          set -euo pipefail
+
+          if [ -f "branch" ]; then
             echo "Found files in root directory"
             BRANCH_FILE="branch"
             REFSPEC_FILE="refspec"
@@ -94,9 +80,9 @@ jobs:
             echo "Error: workflow output files not found in expected locations"
             echo "Current directory contents:"
             ls -la
-            if [ -d "workflow-outputs" ]; then
-              echo "workflow-outputs directory contents:"
-              ls -la workflow-outputs/
+            if [ -d "vpp-gerrit-vars" ]; then
+              echo "vpp-gerrit-vars directory contents:"
+              ls -la vpp-gerrit-vars/
             fi
             exit 1
           fi
@@ -113,24 +99,22 @@ jobs:
           REFSPEC_VALUE=$(cat "$REFSPEC_FILE" | tr -d '\n' | tr -d '\r')
           URL_VALUE=$(cat "$URL_FILE" | tr -d '\n' | tr -d '\r')
 
-          {
-              echo "branch=$BRANCH_VALUE"
-              echo "refspec=$REFSPEC_VALUE"
-              echo "url=$URL_VALUE"
-          } >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH_VALUE" >> $GITHUB_OUTPUT
+          echo "refspec=$REFSPEC_VALUE" >> $GITHUB_OUTPUT
+          echo "url=$URL_VALUE" >> $GITHUB_OUTPUT
 
           echo "Successfully read outputs:"
           echo "  branch=$BRANCH_VALUE"
           echo "  refspec=$REFSPEC_VALUE"
           echo "  url=$URL_VALUE"
 
-  merge-vpp:
-    name: Merge, build, then test new VPP branch HEAD
-    needs: get-workflow-data
+  merge-build-test:
+    name: Merge, Build, & Test VPP
+    needs: get-vpp-gerrit-vars
     uses: ./.github/workflows/vpp-build-test-merge.yml
     with:
       is_merge: true
-      branch: ${{ needs.get-workflow-data.outputs.branch }}
-      refspec: ${{ needs.get-workflow-data.outputs.refspec }}
-      url: ${{ needs.get-workflow-data.outputs.url }}
+      branch: ${{ needs.get-vpp-gerrit-vars.outputs.branch }}
+      refspec: ${{ needs.get-vpp-gerrit-vars.outputs.refspec }}
+      url: ${{ needs.get-vpp-gerrit-vars.outputs.url }}
     secrets: inherit
