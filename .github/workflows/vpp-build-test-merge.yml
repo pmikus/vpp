@@ -5,12 +5,12 @@ on:
   # Invocation from other workflows
   workflow_call:
     inputs:
-      is_merge:
+      is-merge:
         description: 'Merge first, then run build + test phases'
         required: false
         default: false
         type: boolean
-      build_type:
+      build-type:
         description: 'Build type selection (debug, release, or both)'
         required: false
         default: 'release'
@@ -51,18 +51,18 @@ jobs:
       matrix:
         os: ['ubuntu2404', 'ubuntu2204', 'debian12']
         executor_arch: ['x86_64', 'aarch64']
-        build_type: ${{ (inputs.build_type == 'debug' || github.event.inputs.build_type == 'debug') && fromJson('["debug"]') || (inputs.build_type == 'release' || github.event.inputs.build_type == 'release') && fromJson('["release"]') || fromJson('["debug", "release"]') }}
+        build-type: ${{ inputs.build-type == 'both' && fromJson('["debug", "release"]') || fromJson(format('["{0}"]', inputs.build-type)) }}
         exclude:
           # Exclude debian12 on aarch64 for all builds
           - os: 'debian12'
             executor_arch: 'aarch64'
           # Exclude non-ubuntu2204 OS for debug builds
-          - build_type: 'debug'
+          - build-type: 'debug'
             os: 'ubuntu2404'
-          - build_type: 'debug'
+          - build-type: 'debug'
             os: 'debian12'
           # Exclude aarch64 architecture for debug builds
-          - build_type: 'debug'
+          - build-type: 'debug'
             executor_arch: 'aarch64'
 
     env:
@@ -90,6 +90,8 @@ jobs:
 
       - name: Restore VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Gerrit Checkout
         # yamllint disable-line rule:line-length
@@ -123,7 +125,7 @@ jobs:
           fi
 
       - name: Maybe Merge Gerrit Change
-        if: ${{ inputs.is_merge == 'true' }}
+        if: ${{ inputs.is-merge == 'true' }}
         run: |
           set -euxo pipefail
           echo "--- TBD: Merging change before build/test phases ---"

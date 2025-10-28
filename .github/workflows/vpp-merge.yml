@@ -24,4 +24,3 @@ jobs:
       gerrit-branch: ${{ vars.GERRIT_BRANCH }}
       gerrit-refspec: ${{ vars.GERRIT_REFSPEC }}
       gerrit-url: ${{ vars.GERRIT_URL }}
-    secrets: inherit
