@@ -19,7 +19,4 @@ jobs:
     name: Build & Test VPP
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/vpp-build-test-merge.yml
-    with:
-      gerrit-branch: ${{ vars.GERRIT_BRANCH }}
-      gerrit-refspec: ${{ vars.GERRIT_REFSPEC }}
-      gerrit-url: ${{ vars.GERRIT_URL }}
+
