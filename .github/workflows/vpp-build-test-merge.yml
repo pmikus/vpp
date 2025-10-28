@@ -93,20 +93,33 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Display gerrit env vars
+        run: |
+          set -euxo pipefail
+          echo "GERRIT_BRANCH: $GERRIT_BRANCH"
+          echo "GERRIT_CHANGE_ID: $GERRIT_CHANGE_ID"
+          echo "GERRIT_CHANGE_NUMBER: $GERRIT_CHANGE_NUMBER"
+          echo "GERRIT_CHANGE_URL: $GERRIT_CHANGE_URL"
+          echo "GERRIT_EVENT_TYPE: $GERRIT_EVENT_TYPE"
+          echo "GERRIT_PATCHSET_NUMBER: $GERRIT_PATCHSET_NUMBER"
+          echo "GERRIT_PATCHSET_REVISION: $GERRIT_PATCHSET_REVISION"
+          echo "GERRIT_PROJECT: $GERRIT_PROJECT"
+          echo "GERRIT_REFSPEC: $GERRIT_REFSPEC"
+
       - name: Gerrit Checkout
         # yamllint disable-line rule:line-length
         uses: lfit/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
         with:
-          gerrit-refspec: ${{ inputs.gerrit-refspec }}
-          gerrit-project: 'vpp'
-          gerrit-url: ${{ inputs.gerrit-url }}
-          # delay: "30s"
-          ref: refs/heads/${{ inputs.gerrit-branch }}
+          gerrit-refspec: ${{ vars.GERRIT_REFSPEC }}
+          gerrit-project: ${{ vars.GERRIT_PROJECT }}
+          gerrit-url: ${{ vars.GERRIT_CHANGE_URL }}
+          ref: /ref/heads/${{ vars.GERRIT_BRANCH }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
-      - name: Setup Docker VPP Runtime Environment
+      - name: Setup Docker VPP Runtime Environment for 'make test'
         run: |
           set -euxo pipefail
           if [ -n ${DOCKER_TEST} ] ; then

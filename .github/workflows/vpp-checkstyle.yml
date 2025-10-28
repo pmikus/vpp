@@ -100,7 +100,6 @@ jobs:
           gerrit-refspec: ${{ inputs.GERRIT_REFSPEC }}
           gerrit-project: ${{ inputs.GERRIT_PROJECT }}
           gerrit-url: ${{ inputs.GERRIT_CHANGE_URL }}
-          delay: "30s"
           ref: refs/heads/${{ inputs.GERRIT_BRANCH }}
 
       - name: Retrieve GIT commit message
