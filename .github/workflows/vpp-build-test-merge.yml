@@ -123,6 +123,9 @@ jobs:
           set -euxo pipefail
           echo "--- TBD: Merging change before build/test phases ---"
 
+      - name: Install VPP dependencies
+        uses: pmikus/.github/.github/actions/vpp-install-deps@main
+
       - name: Install VPP external dependencies
         uses: pmikus/.github/.github/actions/vpp-install-ext-deps@main
 
