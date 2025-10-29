@@ -109,7 +109,7 @@ jobs:
           gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
           gerrit-project: ${{ env.GERRIT_PROJECT }}
           gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
-          ref: ${{ env.GERRIT_BRANCH }}
+          ref: refs/heads/${{ env.GERRIT_BRANCH }}
 
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup_executor_env@main
