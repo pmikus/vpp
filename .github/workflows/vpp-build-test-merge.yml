@@ -115,22 +115,7 @@ jobs:
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
-        run: |
-          set -euxo pipefail
-          if [ -n ${DOCKER_TEST} ] ; then
-            # for 4 cores:
-            # framework.VppTestCase.MIN_REQ_SHM + (num_cores * framework.VppTestCase.SHM_PER_PROCESS)
-            # 1073741824 == 1024M (1073741824 >> 20)
-            MEM=1024M
-            if [[ ${EXECUTOR_ARCH} == 'aarch64' ]]
-            then
-                # arm build are running with 16 cores, empirical evidence shows
-                # that 2048M is enough
-                MEM=2048M
-            fi
-            sudo mount -o remount /dev/shm -o size=${MEM} || true
-                  echo "/dev/shm remounted with size='${MEM}'"
-          fi
+        uses: pmikus/.github/.github/actions/vpp-docker-runtime-setup@main
 
       - name: Maybe Merge Gerrit Change
         if: ${{ inputs.is-merge == 'true' }}
