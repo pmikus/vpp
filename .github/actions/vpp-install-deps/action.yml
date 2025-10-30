@@ -1,0 +1,23 @@
+---
+name: "🛠️ VPP Install Dependencies"
+description: |
+  This GitHub Action installs the necessary dependencies for VPP.
+
+inputs:
+  TUI_LINE:
+    description: "Delimiter line for TUI output"
+    required: false
+    default: "*******************************************************************"
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "${{ inputs.TUI_LINE }}"
+        echo "Installing VPP dependencies..."
+        make UNATTENDED=yes install-deps
+        echo "${{ inputs.TUI_LINE }}"

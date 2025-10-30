@@ -1,0 +1,29 @@
+---
+name: "🛠️ VPP Docker runtime setup"
+description: |
+  This GitHub Action sets up the Docker runtime environment for VPP.
+
+inputs:
+  TUI_LINE:
+    description: "Delimiter line for TUI output"
+    required: false
+    default: "*******************************************************************"
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Docker VPP Runtime Environment for 'make test'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # for 4 cores:
+        # framework.VppTestCase.MIN_REQ_SHM + (num_cores * framework.VppTestCase.SHM_PER_PROCESS)
+        # 1073741824 == 1024M (1073741824 >> 20)
+        # for 16 cores, empirical evidence shows that 2048M is enough
+        echo "${{ inputs.TUI_LINE }}"
+        MEM=2048M
+        sudo mount -o remount /dev/shm -o size=${MEM} || true
+        echo "/dev/shm remounted with size='${MEM}'"
+        echo "${{ inputs.TUI_LINE }}"
