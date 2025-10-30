@@ -13,7 +13,7 @@ on:
       build-type:
         description: 'Build type selection (debug, release, or both)'
         required: false
-        default: 'release'
+        default: 'both'
         type: string
       GERRIT_BRANCH:
         description: 'Gerrit branch name to checkout'
@@ -89,6 +89,7 @@ jobs:
       GERRIT_CHANGE_URL: ${{ inputs.GERRIT_CHANGE_URL }}
       GERRIT_PROJECT: ${{ inputs.GERRIT_PROJECT }}
       GERRIT_REFSPEC: ${{ inputs.GERRIT_REFSPEC }}
+      TUI_LINE: "*******************************************************************"
 
     steps:
       - name: "Show Nomad Attributes"
@@ -135,12 +136,9 @@ jobs:
         run: |
           set -euxo pipefail
 
-          OS_ID=$(grep '^ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
-          OS_VERSION_ID=$(grep '^VERSION_ID=' /etc/os-release | cut -f2- -d= | sed -e 's/\"//g')
-          OS_ARCH=$(uname -m)
-          MAKE_PARALLEL_FLAGS="${MAKE_PARALLEL_FLAGS:-}"
-          MAKE_PARALLEL_JOBS="${MAKE_PARALLEL_JOBS:-}"
-          MAKE_TEST_OS="${MAKE_TEST_OS:-ubuntu-22.04}"
+          MAKE_PARALLEL_FLAGS="${MAKE_PARALLEL_FLAGS:-16}"
+          MAKE_PARALLEL_JOBS="${MAKE_PARALLEL_JOBS:-16}"
+          MAKE_TEST_OS="${MAKE_TEST_OS:-ubuntu-24.04}"
           MAKE_TEST_MULTIWORKER_OS="${MAKE_TEST_MULTIWORKER_OS:-debian-12}"
           VPPAPIGEN_TEST_OS="${VPPAPIGEN_TEST_OS:-${MAKE_TEST_OS}}"
           BUILD_RESULT="SUCCESSFULLY COMPLETED"
@@ -222,9 +220,7 @@ jobs:
               fi
           }
 
-          if [ "${DRYRUN,,}" != "true" ] ; then
-              make_build_test
-          fi
+          make_build_test
           if [ -n "$BUILD_ERROR" ] ; then
               BUILD_RESULT="$BUILD_ERROR"
               RETVAL="1"
