@@ -92,6 +92,9 @@ jobs:
       TUI_LINE: "*******************************************************************"
 
     steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
       - name: "Show Nomad Attributes"
         uses: pmikus/.github/.github/actions/show-nomad-attributes@main
 
@@ -117,7 +120,7 @@ jobs:
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
-        uses: ./.github/actions/vpp-docker-runtime-setup@main
+        uses: ./.github/actions/vpp-docker-runtime-setup@master
 
       - name: Maybe Merge Gerrit Change
         if: ${{ inputs.is-merge == 'true' }}
@@ -126,10 +129,10 @@ jobs:
           echo "--- TBD: Merging change before build/test phases ---"
 
       - name: Install VPP dependencies
-        uses: ./.github/actions/vpp-install-deps@main
+        uses: ./.github/actions/vpp-install-deps@master
 
       - name: Install VPP external dependencies
-        uses: ./.github/actions/vpp-install-ext-deps@main
+        uses: ./.github/actions/vpp-install-ext-deps@master
 
       - name: Verify VPP Build and Test
         if: ${{ inputs.is-merge != 'true' }}  # FIXME: Only run if not merging to save CI cycles during testing
