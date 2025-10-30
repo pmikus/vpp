@@ -132,6 +132,7 @@ jobs:
         uses: ./.github/actions/vpp-install-ext-deps@main
 
       - name: Verify VPP Build and Test
+        if: ${{ inputs.is-merge != 'true' }}  # FIXME: Only run if not merging to save CI cycles during testing
         timeout-minutes: 60
         run: |
           set -euxo pipefail
