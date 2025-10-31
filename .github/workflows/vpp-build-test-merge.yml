@@ -120,7 +120,7 @@ jobs:
         uses: pmikus/.github/.github/actions/setup_executor_env@main
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
-        uses: pmikus/csit/.github/actions/vpp-docker-runtime-setup@master
+        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
 
       - name: Maybe Merge Gerrit Change
         if: ${{ inputs.is-merge == 'true' }}
@@ -129,10 +129,10 @@ jobs:
           echo "--- TBD: Merging change before build/test phases ---"
 
       - name: Install VPP dependencies
-        uses: pmikus/csit/.github/actions/vpp-install-deps@master
+        uses: pmikus/vpp/.github/actions/vpp-install-deps@master
 
       - name: Install VPP external dependencies
-        uses: pmikus/csit/.github/actions/vpp-install-ext-deps@master
+        uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
 
       - name: Verify VPP Build and Test
         if: ${{ inputs.is-merge != 'true' }}  # FIXME: Only run if not merging to save CI cycles during testing

@@ -90,6 +90,10 @@ jobs:
       - name: "Show Nomad Dockerfile"
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
+      - name: Setup Environment
+        id: setup-executor-env
+        uses: pmikus/.github/.github/actions/setup_executor_env@main
+
       - name: Checkpoint VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-checkpoint@main
 
@@ -105,10 +109,6 @@ jobs:
       - name: Retrieve GIT commit message
         # yamllint disable-line rule:line-length
         uses: lfit/releng-reusable-workflows/.github/actions/git-commit-message-action@main
-
-      - name: Setup Environment
-        id: setup-executor-env
-        uses: pmikus/.github/.github/actions/setup_executor_env@main
 
       - name: Run Checkstyle Scripts
         run: |
