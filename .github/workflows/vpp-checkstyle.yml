@@ -92,7 +92,7 @@ jobs:
 
       - name: Setup Environment
         id: setup-executor-env
-        uses: pmikus/.github/.github/actions/setup_executor_env@main
+        uses: pmikus/.github/.github/actions/setup-executor-env@8930b575136625c5c8a47752192f9cd90202bea3
 
       - name: Checkpoint VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-checkpoint@main

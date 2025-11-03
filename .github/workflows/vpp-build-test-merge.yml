@@ -117,7 +117,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup_executor_env@main
+        uses: pmikus/.github/.github/actions/setup-executor-env@8930b575136625c5c8a47752192f9cd90202bea3
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
         uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
