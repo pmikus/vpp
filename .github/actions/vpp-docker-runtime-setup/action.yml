@@ -4,6 +4,11 @@ description: |
   This GitHub Action sets up the Docker runtime environment for VPP.
 
 inputs:
+  SHM_SIZE:
+    description: "Size of /dev/shm to set for VPP Docker runtime"
+    required: false
+    default: "2048M"
+    type: string
   TUI_LINE:
     description: "Delimiter line for TUI output"
     required: false
@@ -23,7 +28,7 @@ runs:
         # 1073741824 == 1024M (1073741824 >> 20)
         # for 16 cores, empirical evidence shows that 2048M is enough
         echo "${{ inputs.TUI_LINE }}"
-        MEM=2048M
+        MEM=${{ inputs.SHM_SIZE }}
         sudo mount -o remount /dev/shm -o size=${MEM} || true
         echo "/dev/shm remounted with size='${MEM}'"
         echo "${{ inputs.TUI_LINE }}"

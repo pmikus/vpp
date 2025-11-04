@@ -12,7 +12,7 @@ The action performs a two-stage installation process:
 
 ```yaml
 - name: Install VPP External Dependencies
-  uses: ./.github/actions/vpp-install-ext-deps
+  uses: fdio/vpp/.github/actions/vpp-install-ext-deps
   with:
     TUI_LINE: "*******************************************************************"
 ```

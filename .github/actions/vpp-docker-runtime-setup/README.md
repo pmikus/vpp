@@ -14,8 +14,9 @@ VPP tests require substantial shared memory allocation, particularly when runnin
 
 ```yaml
 - name: Setup VPP Docker Runtime
-  uses: fdio/.github/.github/actions/vpp-docker-runtime-setup
+  uses: fdio/vpp/.github/actions/vpp-docker-runtime-setup@master
   with:
+    SHM_SIZE: "2048M"
     TUI_LINE: "*******************************************************************"
 ```
 
@@ -23,6 +24,7 @@ VPP tests require substantial shared memory allocation, particularly when runnin
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
+| `SHM_SIZE` | Size of /dev/shm to set for VPP Docker runtime (e.g., "2048M", "4G") | No | `"2048M"` |
 | `TUI_LINE` | Delimiter line for TUI output formatting | No | `"*******************************************************************"` |
 
 ## What It Does
@@ -33,8 +35,8 @@ VPP tests require substantial shared memory allocation, particularly when runnin
 - **Error Tolerance**: Uses `|| true` to handle cases where remount might not be necessary
 - **Visual Feedback**: Provides clear output with customizable formatting
 
-### 🧮 **Memory Calculation**
-The action uses a calculated memory size based on VPP's test framework requirements:
+### 🧮 **Memory Configuration**
+The action allows configurable memory size via the `SHM_SIZE` input, with intelligent defaults based on VPP's test framework requirements:
 
 ```
 Memory Required = MIN_REQ_SHM + (num_cores × SHM_PER_PROCESS)
@@ -42,7 +44,8 @@ Memory Required = MIN_REQ_SHM + (num_cores × SHM_PER_PROCESS)
 
 - **Base Memory**: 1073741824 bytes (1024MB) minimum required
 - **Per-Core Addition**: Additional memory per CPU core
-- **Total Allocation**: 2048MB for up to 16 cores (empirically determined)
+- **Default Allocation**: 2048MB for up to 16 cores (empirically determined)
+- **Configurable**: Can be adjusted via `SHM_SIZE` input for different environments
 
 ## Technical Details
 
@@ -52,7 +55,7 @@ Memory Required = MIN_REQ_SHM + (num_cores × SHM_PER_PROCESS)
 # framework.VppTestCase.MIN_REQ_SHM + (num_cores * framework.VppTestCase.SHM_PER_PROCESS)
 # 1073741824 == 1024M (1073741824 >> 20)
 # For 16 cores, empirical evidence shows that 2048M is sufficient
-MEM=2048M
+MEM=${{ inputs.SHM_SIZE }}  # Configurable via input, defaults to "2048M"
 ```
 
 ### Mount Operation
@@ -97,7 +100,7 @@ jobs:
         uses: fdio/.github/.github/actions/vpp-install-ext-deps
 
       - name: Setup Docker Runtime for Tests
-        uses: fdio/.github/.github/actions/vpp-docker-runtime-setup
+        uses: fdio/vpp/.github/actions/vpp-docker-runtime-setup@master
 
       - name: Build VPP
         run: make build
@@ -122,15 +125,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Runtime Environment
-        uses: fdio/.github/.github/actions/vpp-docker-runtime-setup
+        uses: fdio/vpp/.github/actions/vpp-docker-runtime-setup@master
         with:
+          SHM_SIZE: "4096M"  # Increased for high-performance testing
           TUI_LINE: "=== Docker Runtime Configuration ==="
 
       - name: Install External Dependencies
-        uses: fdio/.github/.github/actions/vpp-install-ext-deps
+        uses: fdio/vpp/.github/actions/vpp-install-ext-deps@master
 
       - name: Install Optional Dependencies
-        uses: fdio/.github/.github/actions/vpp-install-opt-deps
+        uses: fdio/vpp/.github/actions/vpp-install-opt-deps@master
 
       - name: Build VPP
         run: make build
@@ -146,30 +150,33 @@ jobs:
 
 ```yaml
 - name: Configure VPP Test Environment
-  uses: fdio/.github/.github/actions/vpp-docker-runtime-setup
+  uses: fdio/vpp/.github/actions/vpp-docker-runtime-setup@master
   with:
+    SHM_SIZE: "8192M"  # 8GB for heavy testing workloads
     TUI_LINE: "--- VPP Docker Runtime Setup ---"
 ```
 
 ## Memory Allocation Details
 
-### Why 2048MB?
+### Why 2048MB Default?
 
-The 2048MB allocation is based on:
+The 2048MB default allocation is based on:
 
 1. **VPP Framework Requirements**: Base shared memory needs for VPP test framework
 2. **Multi-Core Support**: Additional memory per CPU core for parallel test execution
 3. **Empirical Testing**: Validated through extensive testing with up to 16 cores
 4. **Safety Margin**: Provides buffer for peak memory usage scenarios
+5. **Flexibility**: Can be increased via `SHM_SIZE` input for demanding workloads
 
 ### Scaling Considerations
 
-| CPU Cores | Recommended Memory | Current Allocation | Status |
-|-----------|-------------------|-------------------|---------|
-| 1-4 cores | ~1024MB | 2048MB | ✅ Sufficient |
-| 5-8 cores | ~1500MB | 2048MB | ✅ Sufficient |
-| 9-16 cores | ~2000MB | 2048MB | ✅ Sufficient |
-| 16+ cores | >2048MB | 2048MB | ⚠️ May need adjustment |
+| CPU Cores | Recommended Memory | Default Allocation | Suggested `SHM_SIZE` |
+|-----------|-------------------|-------------------|---------------------|
+| 1-4 cores | ~1024MB | 2048MB | `"2048M"` (default) |
+| 5-8 cores | ~1500MB | 2048MB | `"2048M"` (default) |
+| 9-16 cores | ~2000MB | 2048MB | `"2048M"` (default) |
+| 17-24 cores | ~3000MB | 2048MB | `"4096M"` |
+| 25+ cores | >4000MB | 2048MB | `"8192M"` or higher |
 
 ## Integration Points
 
