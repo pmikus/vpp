@@ -67,7 +67,8 @@ concurrency:
 
 jobs:
   checkstyle:
-    name: Checkstyle on ${{ matrix.os }} ${{ matrix.executor_arch }}
+    name: vpp-checkstyle-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+    if: ${{ inputs.GERRIT_EVENT_TYPE == 'patchset-created' }}
     runs-on:
       - self-hosted
       - nomad
@@ -92,14 +93,14 @@ jobs:
 
       - name: Setup Environment
         id: setup-executor-env
-        uses: pmikus/.github/.github/actions/setup-executor-env@8930b575136625c5c8a47752192f9cd90202bea3
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
       - name: Checkpoint VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-checkpoint@main
 
       - name: Gerrit Checkout
         # yamllint disable-line rule:line-length
-        uses: lfit/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
         with:
           gerrit-refspec: ${{ inputs.GERRIT_REFSPEC }}
           gerrit-project: ${{ inputs.GERRIT_PROJECT }}

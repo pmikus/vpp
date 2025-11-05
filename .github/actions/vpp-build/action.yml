@@ -7,12 +7,17 @@ inputs:
   MAKE_PARALLEL_JOBS:
     description: "Number of parallel jobs for 'make' (overrides MAKE_PARALLEL_JOBS)"
     required: false
-    default: ""
+    default: "16"
     type: string
   BUILD_TYPE:
     description: "Type of build: debug or release"
     required: false
     default: "release"
+    type: string
+  BUILD_HST:
+    description: "Build VPP for HostStack Test (HST) framework"
+    required: false
+    default: "false"
     type: string
   TUI_LINE:
     description: "Delimiter line for TUI output"
@@ -28,6 +33,7 @@ runs:
       env:
         MAKE_PARALLEL_JOBS: ${{ inputs.MAKE_PARALLEL_JOBS }}
         BUILD_TYPE: ${{ inputs.BUILD_TYPE }}
+        BUILD_HST: ${{ inputs.BUILD_HST }}
         TUI_LINE: ${{ inputs.TUI_LINE }}
       run: |
         set -euo pipefail
@@ -58,8 +64,29 @@ runs:
             fi
         }
 
+        build_hst_vpp() {
+            echo "Building VPP. Number of cores for build set with" \
+                  "MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS}."
+
+            if [ "$BUILD_TYPE" == "debug" ] ; then
+                if ! make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} build ; then
+                    BUILD_ERROR="FAILED HST BUILD 'make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} build'"
+                    return
+                fi
+            else
+              if ! make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} build-release ; then
+                  BUILD_ERROR="FAILED HST BUILD 'make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} build-release'"
+                  return
+              fi
+            fi
+        }
+
         echo "$TUI_LINE"
-        build_vpp
+        if [ "$BUILD_HST" == "true" ] ; then
+            build_hst_vpp
+        else
+            build_vpp
+        fi
         if [ -n "${BUILD_ERROR}" ] ; then
             BUILD_RESULT="${BUILD_ERROR}"
             RETVAL="1"

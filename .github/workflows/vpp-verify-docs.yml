@@ -1,0 +1,81 @@
+name: vpp-verify-docs
+
+on:
+  workflow_run:
+    workflows: ["vpp-checkstyle"]
+    types:
+      - completed
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: verify-docs-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  vpp-verify-docs:
+    name: vpp-verify-docs-${{ github.event.workflow_run.head_branch }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=x86_64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+
+    env:
+      WORKSPACE: ${{ github.workspace }}
+      GERRIT_BRANCH: ""
+      GERRIT_CHANGE_URL: ""
+      GERRIT_PROJECT: ""
+      GERRIT_REFSPEC: ""
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: "Show Nomad Attributes"
+        uses: pmikus/.github/.github/actions/show-nomad-attributes@main
+
+      - name: "Show Nomad Dockerfile"
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Restore VPP Gerrit Environment Variables
+        uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Gerrit Checkout
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+        with:
+          gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
+          gerrit-project: ${{ env.GERRIT_PROJECT }}
+          gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
+          ref: refs/heads/${{ env.GERRIT_BRANCH }}
+          fetch-depth: 0
+          delay: "0s"
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: Make Docs
+        run: |
+          set -euo pipefail
+          make docs
+
+      - name: Upload Documentation Artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: vpp-docs-${{ github.event.workflow_run.head_branch }}
+          path: build-root/docs/
+          retention-days: 7

@@ -1,4 +1,4 @@
-name: vpp-merge-make-test
+name: vpp-merge-docs
 
 on:
   workflow_dispatch:
@@ -55,48 +55,28 @@ defaults:
   run:
     shell: bash
 
+concurrency:
+  group: merge-docs-${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-${{ inputs.GERRIT_CHANGE_ID }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: read
 
 jobs:
-  merge-make-test:
-    name: vpp-merge-make-test-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+  merge-docs:
+    name: vpp-merge-docs-${{ inputs.GERRIT_BRANCH }}
     if: ${{ inputs.GERRIT_EVENT_TYPE == 'change-merged' }}
     runs-on:
       - self-hosted
       - nomad
-      - fdio:arch=${{ matrix.executor_arch }}
+      - fdio:arch=x86_64
       - fdio:class=builder
       - fdio:namespace=sandbox
-      - fdio:os=${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ['ubuntu2404', 'ubuntu2204', 'debian12']
-        executor_arch: ['x86_64', 'aarch64']
-        exclude:
-          # Exclude debian12 on aarch64 for all builds
-          - os: 'debian12'
-            executor_arch: 'aarch64'
+      - fdio:os=ubuntu2404
 
     env:
-      BUILD_TYPE: 'release'
-      CACHE_DATE: ${{ github.run_id }}
-      CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
-      MAKE_PARALLEL_JOBS: 16
-      TEST_JOBS: 16
-      TEST_RETRIES: 3
-      MAKE_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04'  }}
-      MAKE_TEST_MULTIWORKER_OS: 'debian-12'
-      VPPAPIGEN_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
-      SHM_SIZE: ${{ matrix.executor_arch == 'aarch64' && '4096M' || '2048M' }}
       WORKSPACE: ${{ github.workspace }}
-      GERRIT_BRANCH: ""
-      GERRIT_CHANGE_URL: ""
-      GERRIT_PROJECT: ""
-      GERRIT_REFSPEC: ""
       TUI_LINE: "*******************************************************************"
 
     steps:
@@ -110,7 +90,6 @@ jobs:
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
       - name: Gerrit Checkout
-        # yamllint disable-line rule:line-length
         uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
         with:
           gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
@@ -122,28 +101,15 @@ jobs:
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup-executor-env@main
 
-      - name: Setup Docker VPP Runtime Environment for 'make test'
-        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
+      - name: Make Docs
+        run: |
+          set -euo pipefail
+          make docs
 
-      - name: Install VPP dependencies
-        uses: pmikus/vpp/.github/actions/vpp-install-deps@master
-
-      - name: Install VPP external dependencies
-        uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
-
-      - name: Build VPP
-        uses: pmikus/vpp/.github/actions/vpp-build@master
+      - name: Upload Documentation Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
-          BUILD_TYPE: ${{ env.BUILD_TYPE }}
-
-      - name: VPP Make Test
-        uses: pmikus/vpp/.github/actions/vpp-make-test@master
-        timeout-minutes: 75
-        with:
-          TEST_JOBS: ${{ env.TEST_JOBS }}
-          MAKE_TEST_OS: ${{ env.MAKE_TEST_OS }}
-          MAKE_TEST_MULTIWORKER_OS: ${{ env.MAKE_TEST_MULTIWORKER_OS }}
-          VPPAPIGEN_TEST_OS: ${{ env.VPPAPIGEN_TEST_OS }}
-
-
+          name: vpp-docs-${{ inputs.GERRIT_BRANCH }}
+          path: build-root/docs/
+          retention-days: 7

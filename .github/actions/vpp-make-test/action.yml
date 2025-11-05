@@ -56,38 +56,41 @@ runs:
       run: |
           set -euxo pipefail
 
-          BUILD_RESULT="SUCCESSFULLY COMPLETED"
+          BUILD_RESULT="\n* MAKE TEST SUCCESSFULLY COMPLETED"
           BUILD_ERROR=""
           RETVAL="0"
 
           make_test() {
               if ! make UNATTENDED=yes test-dep ; then
-                  BUILD_ERROR="FAILED 'make test-dep'"
+                  BUILD_ERROR+="\n* FAILED 'make UNATTENDED=yes test-dep'"
                   return
               fi
               if grep -q "${OS_ID}-${OS_VERSION_ID}" <<< "${VPPAPIGEN_TEST_OS}"; then
                   if ! src/tools/vppapigen/test_vppapigen.py ; then
-                      BUILD_ERROR="FAILED src/tools/vppapigen/test_vppapigen.py"
+                      BUILD_ERROR+="\n* FAILED src/tools/vppapigen/test_vppapigen.py"
                       return
                   fi
               fi
               if grep -q "${OS_ID}-${OS_VERSION_ID}" <<< "${MAKE_TEST_OS}"; then
                   if ! make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS="$TEST_JOBS" RETRIES=3 test ; then
-                      BUILD_ERROR="FAILED 'make test'"
+                      BUILD_ERROR+="\n* FAILED 'make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS "
+                      BUILD_ERROR+="RETRIES=3 test'"
                       return
                   fi
               else
                   echo "Skip running 'make test' on ${OS_ID}-${OS_VERSION_ID}"
               fi
               if grep -q "${OS_ID}-${OS_VERSION_ID}" <<< "${MAKE_TEST_MULTIWORKER_OS}"; then
+                  # Hard-code multiworker test jobs for now
+                  TEST_JOBS="8"
                   if ! make VPP_WORKER_COUNT="${VPP_WORKER_COUNT}" COMPRESS_FAILED_TEST_LOGS=yes \
                           TEST_RETRIES="${TEST_RETRIES}" TEST_JOBS="${TEST_JOBS}" test ; then
-                      BUILD_ERROR="FAILED 'make VPP_WORKER_COUNT=${VPP_WORKER_COUNT} COMPRESS_FAILED_TEST_LOGS=yes \
-                          RETRIES=${TEST_RETRIES} TEST_JOBS=${TEST_JOBS} test'"
+                      BUILD_ERROR+="\n* FAILED 'make VPP_WORKER_COUNT=${VPP_WORKER_COUNT} "
+                      BUILD_ERROR+="COMPRESS_FAILED_TEST_LOGS=yes "
+                      BUILD_ERROR+="RETRIES=${TEST_RETRIES} TEST_JOBS=${TEST_JOBS} test'"
                       return
                   else
-                      echo -e "\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^}" \
-                              "MULTIWORKER MAKE TEST SUCCESSFULLY COMPLETED\n"
+                      BUILD_RESULT+="\n* MULTIWORKER MAKE TEST SUCCESSFULLY COMPLETED"
                   fi
               else
                   echo "Skip running MULTIWORKER MAKE TEST on ${OS_ID}-${OS_VERSION_ID}"
@@ -100,6 +103,6 @@ runs:
               BUILD_RESULT="$BUILD_ERROR"
               RETVAL="1"
           fi
-          echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^}" \
-                  "BUILD $BUILD_RESULT\n$TUI_LINE\n"
+          echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^} BUILD " \
+                  "$BUILD_RESULT\n$TUI_LINE\n"
           exit $RETVAL

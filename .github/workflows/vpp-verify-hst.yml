@@ -1,4 +1,4 @@
-name: vpp-verify-make-test
+name: vpp-verify-hst
 
 on:
   workflow_run:
@@ -15,47 +15,37 @@ permissions:
   actions: read
 
 jobs:
-  vpp-verify-make-test:
-    name: vpp-verify-make-test-${{ github.event.workflow_run.head_branch }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+  vpp-verify-hst:
+    name: vpp-verify-hst-${{ github.event.workflow_run.head_branch }}-${{ matrix.os }}-${{ matrix.executor_arch }}
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
       - nomad
       - fdio:arch=${{ matrix.executor_arch }}
-      - fdio:class=builder
+      - fdio:class=hst
       - fdio:namespace=sandbox
       - fdio:os=${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu2404', 'ubuntu2204', 'debian12']
+        os: ['ubuntu2404', 'ubuntu2204']
         executor_arch: ['x86_64', 'aarch64']
         build-type: ['debug', 'release']
         exclude:
-          # Exclude debian12 on aarch64 for all builds
-          - os: 'debian12'
+          # Exclude ubuntu2404 OS for all builds on aarch64
+          - os: 'ubuntu2404'
             executor_arch: 'aarch64'
-          # Exclude non-ubuntu2204 OS for debug builds
-          - build-type: 'debug'
+          # Exclude release build ubuntu2404 OS on all architectures
+          - build-type: 'release'
             os: 'ubuntu2404'
-          - build-type: 'debug'
-            os: 'debian12'
-          # Exclude aarch64 architecture for debug builds
-          - build-type: 'debug'
-            executor_arch: 'aarch64'
 
     env:
       CACHE_DATE: ${{ github.run_id }}
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
-      TEST_JOBS: 16
-      TEST_RETRIES: 3
-      MAKE_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04'  }}
-      MAKE_TEST_MULTIWORKER_OS: 'debian-12'
-      VPPAPIGEN_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
-      SHM_SIZE: ${{ matrix.executor_arch == 'aarch64' && '4096M' || '2048M' }}
       WORKSPACE: ${{ github.workspace }}
+      HS_TEST_DIR: ${{ github.workspace }}/test-c/hs-test
       GERRIT_BRANCH: ""
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
@@ -91,29 +81,23 @@ jobs:
       - name: Setup Environment
         uses: pmikus/.github/.github/actions/setup-executor-env@main
 
-      - name: Setup Docker VPP Runtime Environment for 'make test'
-        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
-        with:
-          SHM_SIZE: ${{ env.SHM_SIZE }}
-
       - name: Install VPP dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-deps@master
 
       - name: Install VPP external dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
 
-      - name: Build VPP
+      - name: HST VPP Build
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
           BUILD_TYPE: ${{ matrix['build-type'] }}
+          BUILD_HST: 'true'
 
-      - name: VPP Make Test
-        uses: pmikus/vpp/.github/actions/vpp-make-test@master
-        timeout-minutes: 75
+      - name: HST Test VPP
+        uses: pmikus/vpp/.github/actions/vpp-hst-test@master
+        timeout-minutes: 60
         with:
-          TEST_JOBS: ${{ env.TEST_JOBS }}
-          TEST_RETRIES: ${{ env.TEST_RETRIES }}
-          MAKE_TEST_OS: ${{ env.MAKE_TEST_OS }}
-          MAKE_TEST_MULTIWORKER_OS: ${{ env.MAKE_TEST_MULTIWORKER_OS }}
-          VPPAPIGEN_TEST_OS: ${{ env.VPPAPIGEN_TEST_OS }}
+          BUILD_TYPE: ${{ matrix['build-type'] }}
+          HS_TEST_DIR: ${{ env.HS_TEST_DIR }}
+          TUI_LINE: ${{ env.TUI_LINE }}
