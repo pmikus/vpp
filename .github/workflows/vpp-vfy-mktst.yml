@@ -1,55 +1,10 @@
-name: vpp-merge-make-test
+name: vpp-vfy-mktst
 
 on:
-  workflow_dispatch:
-    inputs:
-      GERRIT_BRANCH:
-        description: "Branch that change is against"
-        required: true
-        type: string
-      GERRIT_CHANGE_ID:
-        description: "The ID for the change"
-        required: true
-        type: string
-      GERRIT_CHANGE_NUMBER:
-        description: "The Gerrit number"
-        required: true
-        type: string
-      GERRIT_CHANGE_URL:
-        description: "URL to the change"
-        required: true
-        type: string
-      GERRIT_EVENT_TYPE:
-        description: "Type of Gerrit event"
-        required: true
-        type: string
-      GERRIT_PATCHSET_NUMBER:
-        description: "The patch number for the change"
-        required: true
-        type: string
-      GERRIT_PATCHSET_REVISION:
-        description: "The revision sha"
-        required: true
-        type: string
-      GERRIT_PROJECT:
-        description: "Project in Gerrit"
-        required: true
-        type: string
-      GERRIT_REFSPEC:
-        description: "Gerrit refspec of change"
-        required: true
-        type: string
-
-env:
-  GERRIT_BRANCH: ${{ inputs.GERRIT_BRANCH }}
-  GERRIT_CHANGE_ID: ${{ inputs.GERRIT_CHANGE_ID }}
-  GERRIT_CHANGE_NUMBER: ${{ inputs.GERRIT_CHANGE_NUMBER }}
-  GERRIT_CHANGE_URL: ${{ inputs.GERRIT_CHANGE_URL }}
-  GERRIT_EVENT_TYPE: ${{ inputs.GERRIT_EVENT_TYPE }}
-  GERRIT_PATCHSET_NUMBER: ${{ inputs.GERRIT_PATCHSET_NUMBER }}
-  GERRIT_PATCHSET_REVISION: ${{ inputs.GERRIT_PATCHSET_REVISION }}
-  GERRIT_PROJECT: ${{ inputs.GERRIT_PROJECT }}
-  GERRIT_REFSPEC: ${{ inputs.GERRIT_REFSPEC }}
+  workflow_run:
+    workflows: ["vpp-checkstyle"]
+    types:
+      - completed
 
 defaults:
   run:
@@ -59,10 +14,14 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: required-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
 jobs:
-  merge-make-test:
-    name: vpp-merge-make-test-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}-${{ matrix.executor_arch }}
-    if: ${{ inputs.GERRIT_EVENT_TYPE == 'change-merged' }}
+  vpp-verify-make-test:
+    name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
       - nomad
@@ -76,13 +35,21 @@ jobs:
       matrix:
         os: ['ubuntu2404', 'ubuntu2204', 'debian12']
         executor_arch: ['x86_64', 'aarch64']
+        build_type: ['dbg', 'rel']
         exclude:
           # Exclude debian12 on aarch64 for all builds
           - os: 'debian12'
             executor_arch: 'aarch64'
+          # Exclude non-ubuntu2204 OS for debug builds
+          - build_type: 'dbg'
+            os: 'ubuntu2404'
+          - build_type: 'dbg'
+            os: 'debian12'
+          # Exclude aarch64 architecture for debug builds
+          - build_type: 'dbg'
+            executor_arch: 'aarch64'
 
     env:
-      BUILD_TYPE: 'release'
       CACHE_DATE: ${{ github.run_id }}
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
@@ -109,6 +76,11 @@ jobs:
       - name: "Show Nomad Dockerfile"
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
+      - name: Restore VPP Gerrit Environment Variables
+        uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Gerrit Checkout
         # yamllint disable-line rule:line-length
         uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
@@ -116,6 +88,7 @@ jobs:
           gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
           gerrit-project: ${{ env.GERRIT_PROJECT }}
           gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
+          ref: refs/heads/${{ env.GERRIT_BRANCH }}
           fetch-depth: 0
           delay: "0s"
 
@@ -124,6 +97,8 @@ jobs:
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
         uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
+        with:
+          SHM_SIZE: ${{ env.SHM_SIZE }}
 
       - name: Install VPP dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-deps@master
@@ -135,15 +110,14 @@ jobs:
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
-          BUILD_TYPE: ${{ env.BUILD_TYPE }}
+          BUILD_TYPE: ${{ matrix['build_type'] }}
 
       - name: VPP Make Test
         uses: pmikus/vpp/.github/actions/vpp-make-test@master
         timeout-minutes: 75
         with:
           TEST_JOBS: ${{ env.TEST_JOBS }}
+          TEST_RETRIES: ${{ env.TEST_RETRIES }}
           MAKE_TEST_OS: ${{ env.MAKE_TEST_OS }}
           MAKE_TEST_MULTIWORKER_OS: ${{ env.MAKE_TEST_MULTIWORKER_OS }}
           VPPAPIGEN_TEST_OS: ${{ env.VPPAPIGEN_TEST_OS }}
-
-

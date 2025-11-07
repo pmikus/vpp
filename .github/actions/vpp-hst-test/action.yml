@@ -7,9 +7,9 @@ description: |
 
 inputs:
   BUILD_TYPE:
-    description: "Type of build: debug or release"
+    description: "Type of build: debug (dbg) or release (rel)"
     required: false
-    default: "debug"
+    default: "dbg"
     type: string
   HS_TEST_DIR:
     description: "Directory containing HostStack Test (HST) framework tests"
@@ -66,7 +66,7 @@ runs:
           ls -la /scratch/ccache || true # DEBUG ONLY, DO NOT COMMIT
           ls -l /var/crash || true
 
-          if [ "${{ inputs.BUILD_TYPE }}" == "debug" ] ; then
+          if [ "${{ inputs.BUILD_TYPE }}" == "dbg" ] ; then
               hst_debug_build_run
           else
               hst_build_run

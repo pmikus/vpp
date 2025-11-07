@@ -1,0 +1,120 @@
+name: vpp-mrg-docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      GERRIT_BRANCH:
+        description: "Branch that change is against"
+        required: true
+        type: string
+      GERRIT_CHANGE_ID:
+        description: "The ID for the change"
+        required: true
+        type: string
+      GERRIT_CHANGE_NUMBER:
+        description: "The Gerrit number"
+        required: true
+        type: string
+      GERRIT_CHANGE_URL:
+        description: "URL to the change"
+        required: true
+        type: string
+      GERRIT_EVENT_TYPE:
+        description: "Type of Gerrit event"
+        required: true
+        type: string
+      GERRIT_PATCHSET_NUMBER:
+        description: "The patch number for the change"
+        required: true
+        type: string
+      GERRIT_PATCHSET_REVISION:
+        description: "The revision sha"
+        required: true
+        type: string
+      GERRIT_PROJECT:
+        description: "Project in Gerrit"
+        required: true
+        type: string
+      GERRIT_REFSPEC:
+        description: "Gerrit refspec of change"
+        required: true
+        type: string
+
+env:
+  GERRIT_BRANCH: ${{ inputs.GERRIT_BRANCH }}
+  GERRIT_CHANGE_ID: ${{ inputs.GERRIT_CHANGE_ID }}
+  GERRIT_CHANGE_NUMBER: ${{ inputs.GERRIT_CHANGE_NUMBER }}
+  GERRIT_CHANGE_URL: ${{ inputs.GERRIT_CHANGE_URL }}
+  GERRIT_EVENT_TYPE: ${{ inputs.GERRIT_EVENT_TYPE }}
+  GERRIT_PATCHSET_NUMBER: ${{ inputs.GERRIT_PATCHSET_NUMBER }}
+  GERRIT_PATCHSET_REVISION: ${{ inputs.GERRIT_PATCHSET_REVISION }}
+  GERRIT_PROJECT: ${{ inputs.GERRIT_PROJECT }}
+  GERRIT_REFSPEC: ${{ inputs.GERRIT_REFSPEC }}
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: required-${{ github.workflow }}-${{ inputs.GERRIT_CHANGE_NUMBER }}
+  cancel-in-progress: true
+
+jobs:
+  vpp-merge-docs:
+    name: ${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-rel-ubuntu2404-x86_64
+    if: ${{ inputs.GERRIT_EVENT_TYPE == 'change-merged' }}
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=x86_64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+
+    env:
+      WORKSPACE: ${{ github.workspace }}
+      GERRIT_BRANCH: ""
+      GERRIT_CHANGE_URL: ""
+      GERRIT_PROJECT: ""
+      GERRIT_REFSPEC: ""
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: "Show Nomad Attributes"
+        uses: pmikus/.github/.github/actions/show-nomad-attributes@main
+
+      - name: "Show Nomad Dockerfile"
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Gerrit Checkout
+        # yamllint disable-line rule:line-length
+        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+        with:
+          gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
+          gerrit-project: ${{ env.GERRIT_PROJECT }}
+          gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
+          fetch-depth: 0
+          delay: "0s"
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: Make Docs
+        run: |
+          set -euo pipefail
+          make docs
+
+      - name: Upload Documentation Artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: vpp-docs-${{ github.event.workflow_run.head_branch }}
+          path: build-root/docs/
+          retention-days: 7

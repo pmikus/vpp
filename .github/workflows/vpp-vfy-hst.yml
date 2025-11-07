@@ -1,4 +1,4 @@
-name: vpp-verify-hst
+name: vpp-vfy-hst
 
 on:
   workflow_run:
@@ -14,9 +14,13 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: required-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
 jobs:
   vpp-verify-hst:
-    name: vpp-verify-hst-${{ github.event.workflow_run.head_branch }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+    name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
@@ -31,13 +35,13 @@ jobs:
       matrix:
         os: ['ubuntu2404', 'ubuntu2204']
         executor_arch: ['x86_64', 'aarch64']
-        build-type: ['debug', 'release']
+        build_type: ['dbg', 'rel']
         exclude:
           # Exclude ubuntu2404 OS for all builds on aarch64
           - os: 'ubuntu2404'
             executor_arch: 'aarch64'
           # Exclude release build ubuntu2404 OS on all architectures
-          - build-type: 'release'
+          - build_type: 'release'
             os: 'ubuntu2404'
 
     env:
@@ -91,13 +95,13 @@ jobs:
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
-          BUILD_TYPE: ${{ matrix['build-type'] }}
+          BUILD_TYPE: ${{ matrix['build_type'] }}
           BUILD_HST: 'true'
 
       - name: HST Test VPP
         uses: pmikus/vpp/.github/actions/vpp-hst-test@master
         timeout-minutes: 60
         with:
-          BUILD_TYPE: ${{ matrix['build-type'] }}
+          BUILD_TYPE: ${{ matrix['build_type'] }}
           HS_TEST_DIR: ${{ env.HS_TEST_DIR }}
           TUI_LINE: ${{ env.TUI_LINE }}

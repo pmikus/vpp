@@ -62,29 +62,52 @@ permissions:
 
 concurrency:
   # yamllint disable-line rule:line-length
-  group: required-verify-${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-${{ inputs.GERRIT_CHANGE_ID || github.run_id }}
+  group: required-${{ github.workflow }}-${{ inputs.GERRIT_CHANGE_NUMBER }}
   cancel-in-progress: true
 
 jobs:
   checkstyle:
-    name: vpp-checkstyle-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+    name: ${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-rel-ubuntu2404-x86_64
     if: ${{ inputs.GERRIT_EVENT_TYPE == 'patchset-created' }}
     runs-on:
       - self-hosted
       - nomad
-      - fdio:arch=${{ matrix.executor_arch }}
+      - fdio:arch=x86_64
       - fdio:class=builder
       - fdio:namespace=sandbox
-      - fdio:os=${{ matrix.os }}
+      - fdio:os=ubuntu2404
     env:
       TUI_LINE: "*******************************************************************"
 
-    strategy:
-      matrix:
-        os: [ubuntu2404]
-        executor_arch: [x86_64]
-
     steps:
+      - name: Debug GitHub Event Workflow Run
+        run: |
+          echo "=== Full workflow_run event ==="
+          echo '${{ toJSON(github.event.workflow_run) }}'
+          echo ""
+          echo "=== Specific fields ==="
+          echo "head_branch: '${{ github.event.workflow_run.head_branch }}'"
+          echo "head_sha: '${{ github.event.workflow_run.head_sha }}'"
+          echo "name: '${{ github.event.workflow_run.name }}'"
+          echo "id: '${{ github.event.workflow_run.id }}'"
+          echo ""
+          echo "=== Head repository ==="
+          echo '${{ toJSON(github.event.workflow_run.head_repository) }}'
+          echo ""
+          echo "=== Head commit ==="
+          echo '${{ toJSON(github.event.workflow_run.head_commit) }}'
+          echo "=== GitHub Context ==="
+          echo '${{ toJSON(github) }}'
+          echo ""
+          echo "=== GitHub Event Context ==="
+          echo '${{ toJSON(github.event) }}'
+          echo ""
+          echo "=== GitHub Event Workflow Run ==="
+          echo '${{ toJSON(github.event.workflow_run) }}'
+          echo ""
+          echo "=== Environment Variables ==="
+          env | sort
+
       - name: "Show Nomad Attributes"
         uses: pmikus/.github/.github/actions/show-nomad-attributes@main
 

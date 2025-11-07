@@ -1,4 +1,4 @@
-name: vpp-verify-make-test
+name: vpp-vfy-gcc
 
 on:
   workflow_run:
@@ -14,9 +14,13 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: required-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
 jobs:
-  vpp-verify-make-test:
-    name: vpp-verify-make-test-${{ github.event.workflow_run.head_branch }}-${{ matrix.os }}-${{ matrix.executor_arch }}
+  vpp-verify-gcc:
+    name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
@@ -29,26 +33,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu2404', 'ubuntu2204', 'debian12']
-        executor_arch: ['x86_64', 'aarch64']
-        build-type: ['debug', 'release']
-        exclude:
-          # Exclude debian12 on aarch64 for all builds
-          - os: 'debian12'
-            executor_arch: 'aarch64'
-          # Exclude non-ubuntu2204 OS for debug builds
-          - build-type: 'debug'
-            os: 'ubuntu2404'
-          - build-type: 'debug'
-            os: 'debian12'
-          # Exclude aarch64 architecture for debug builds
-          - build-type: 'debug'
-            executor_arch: 'aarch64'
+        os: ['ubuntu2404']
+        executor_arch: ['x86_64']
+        build_type: ['dbg', 'rel']
 
     env:
       CACHE_DATE: ${{ github.run_id }}
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
+      MAKE_TEST_SUITES: "vlib vppinfra vpe_api vapi cli bihash"
       TEST_JOBS: 16
       TEST_RETRIES: 3
       MAKE_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04'  }}
@@ -63,6 +56,34 @@ jobs:
       TUI_LINE: "*******************************************************************"
 
     steps:
+      - name: Debug GitHub Event Workflow Run
+        run: |
+          echo "=== Full workflow_run event ==="
+          echo '${{ toJSON(github.event.workflow_run) }}'
+          echo ""
+          echo "=== Specific fields ==="
+          echo "head_branch: '${{ github.event.workflow_run.head_branch }}'"
+          echo "head_sha: '${{ github.event.workflow_run.head_sha }}'"
+          echo "name: '${{ github.event.workflow_run.name }}'"
+          echo "id: '${{ github.event.workflow_run.id }}'"
+          echo ""
+          echo "=== Head repository ==="
+          echo '${{ toJSON(github.event.workflow_run.head_repository) }}'
+          echo ""
+          echo "=== Head commit ==="
+          echo '${{ toJSON(github.event.workflow_run.head_commit) }}'
+          echo "=== GitHub Context ==="
+          echo '${{ toJSON(github) }}'
+          echo ""
+          echo "=== GitHub Event Context ==="
+          echo '${{ toJSON(github.event) }}'
+          echo ""
+          echo "=== GitHub Event Workflow Run ==="
+          echo '${{ toJSON(github.event.workflow_run) }}'
+          echo ""
+          echo "=== Environment Variables ==="
+          env | sort
+
       - name: Actions Checkout
         uses: actions/checkout@v5
 
@@ -106,12 +127,15 @@ jobs:
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
-          BUILD_TYPE: ${{ matrix['build-type'] }}
+          BUILD_TYPE: ${{ matrix['build_type'] }}
+          USE_GCC: "true"
 
       - name: VPP Make Test
         uses: pmikus/vpp/.github/actions/vpp-make-test@master
-        timeout-minutes: 75
+        timeout-minutes: 60
         with:
+          BUILD_TYPE: ${{ matrix['build_type'] }}
+          MAKE_TEST_SUITES: ${{ env.MAKE_TEST_SUITES }}
           TEST_JOBS: ${{ env.TEST_JOBS }}
           TEST_RETRIES: ${{ env.TEST_RETRIES }}
           MAKE_TEST_OS: ${{ env.MAKE_TEST_OS }}

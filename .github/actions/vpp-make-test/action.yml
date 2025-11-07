@@ -4,6 +4,11 @@ description: |
   This GitHub Action tests the VPP image built using the vpp-build action.
 
 inputs:
+  BUILD_TYPE:
+    description: "Type of build: debug (dbg) or release (rel)"
+    required: false
+    default: "rel"
+    type: string
   TEST_JOBS:
     description: "Number of parallel jobs for 'make test'"
     required: false
@@ -34,6 +39,11 @@ inputs:
     required: false
     default: "2"
     type: string
+  MAKE_TEST_SUITES:
+    description: "Specific set of test suites to run"
+    required: false
+    default: ""
+    type: string
   TUI_LINE:
     description: "Delimiter line for TUI output"
     required: false
@@ -46,6 +56,8 @@ runs:
     - name: VPP Make Test
       shell: bash
       env:
+        BUILD_TYPE: ${{ inputs.BUILD_TYPE }}
+        MAKE_TEST_SUITES: ${{ inputs.MAKE_TEST_SUITES }}
         TEST_JOBS: ${{ inputs.TEST_JOBS }}
         TEST_RETRIES: ${{ inputs.TEST_RETRIES }}
         MAKE_TEST_OS: ${{ inputs.MAKE_TEST_OS }}
@@ -56,9 +68,28 @@ runs:
       run: |
           set -euxo pipefail
 
+          if [ "$BUILD_TYPE" == "dbg" ] ; then
+              TEST_TARGET="test-debug"
+          else
+              TEST_TARGET="test"
+          fi
+
           BUILD_RESULT="\n* MAKE TEST SUCCESSFULLY COMPLETED"
           BUILD_ERROR=""
           RETVAL="0"
+
+          make_test_suites() {
+              for suite in $MAKE_TEST_SUITES ; do
+                  if ! make UNATTENDED=yes CCACHE_DISABLE=1 TESTS_GCOV=1 TEST_JOBS="$TEST_JOBS" TEST=$suite $TEST_TARGET ; then
+                      BUILD_ERROR="FAILED 'make UNATTENDED=yes CCACHE_DISABLE=1 TESTS_GCOV=1 TEST_JOBS="$TEST_JOBS" TEST=$suite $TEST_TARGET'!"
+                      return
+                  fi
+                  if ! make UNATTENDED=yes CCACHE_DISABLE=1 TESTS_GCOV=1 TEST_JOBS="$TEST_JOBS" TEST=$suite $TEST_TARGET ; then
+                      BUILD_ERROR="FAILED 'make UNATTENDED=yes CCACHE_DISABLE=1 TESTS_GCOV=1 TEST_JOBS="$TEST_JOBS" TEST=$suite $TEST_TARGET'!"
+                      return
+                  fi
+              done
+          }
 
           make_test() {
               if ! make UNATTENDED=yes test-dep ; then
@@ -72,9 +103,9 @@ runs:
                   fi
               fi
               if grep -q "${OS_ID}-${OS_VERSION_ID}" <<< "${MAKE_TEST_OS}"; then
-                  if ! make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS="$TEST_JOBS" RETRIES=3 test ; then
-                      BUILD_ERROR+="\n* FAILED 'make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS "
-                      BUILD_ERROR+="RETRIES=3 test'"
+                  if ! make COMPRESS_FAILED_TEST_LOGS=yes TEST="\"$MAKE_TEST_SUITES\"" TEST_JOBS="$TEST_JOBS" RETRIES="$TEST_RETRIES" $TEST_TARGET ; then
+                      BUILD_ERROR+="\n* FAILED 'make COMPRESS_FAILED_TEST_LOGS=yes TEST=\"$MAKE_TEST_SUITES\" "
+                      BUILD_ERROR+="TEST_JOBS=$TEST_JOBS RETRIES=$TEST_RETRIES $TEST_TARGET'"
                       return
                   fi
               else
@@ -84,10 +115,10 @@ runs:
                   # Hard-code multiworker test jobs for now
                   TEST_JOBS="8"
                   if ! make VPP_WORKER_COUNT="${VPP_WORKER_COUNT}" COMPRESS_FAILED_TEST_LOGS=yes \
-                          TEST_RETRIES="${TEST_RETRIES}" TEST_JOBS="${TEST_JOBS}" test ; then
+                          TEST_RETRIES="${TEST_RETRIES}" TEST_JOBS="${TEST_JOBS}" $TEST_TARGET ; then
                       BUILD_ERROR+="\n* FAILED 'make VPP_WORKER_COUNT=${VPP_WORKER_COUNT} "
                       BUILD_ERROR+="COMPRESS_FAILED_TEST_LOGS=yes "
-                      BUILD_ERROR+="RETRIES=${TEST_RETRIES} TEST_JOBS=${TEST_JOBS} test'"
+                      BUILD_ERROR+="RETRIES=${TEST_RETRIES} TEST_JOBS=${TEST_JOBS} $TEST_TARGET'"
                       return
                   else
                       BUILD_RESULT+="\n* MULTIWORKER MAKE TEST SUCCESSFULLY COMPLETED"
@@ -98,7 +129,11 @@ runs:
           }
 
           echo "$TUI_LINE"
-          make_test
+          if [ -n "$MAKE_TEST_SUITES" ] ; then
+              make_test_suites
+          else
+              make_test
+          fi
           if [ -n "$BUILD_ERROR" ] ; then
               BUILD_RESULT="$BUILD_ERROR"
               RETVAL="1"

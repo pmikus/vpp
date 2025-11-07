@@ -1,4 +1,4 @@
-name: vpp-verify-docs
+name: vpp-vfy-docs
 
 on:
   workflow_run:
@@ -10,17 +10,17 @@ defaults:
   run:
     shell: bash
 
-concurrency:
-  group: verify-docs-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
   actions: read
 
+concurrency:
+  group: required-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
 jobs:
   vpp-verify-docs:
-    name: vpp-verify-docs-${{ github.event.workflow_run.head_branch }}
+    name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-rel-ubuntu2404-x86_64
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
@@ -36,6 +36,8 @@ jobs:
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
       GERRIT_REFSPEC: ""
+      GERRIT_CHANGE_NUMBER: ""
+      GERRIT_PATCHSET_NUMBER: ""
       TUI_LINE: "*******************************************************************"
 
     steps:
@@ -76,6 +78,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: vpp-docs-${{ github.event.workflow_run.head_branch }}
+          name: vpp-docs-${{ env.GERRIT_BRANCH }}-${{ env.GERRIT_CHANGE_NUMBER }}-${{ env.GERRIT_PATCHSET_NUMBER }}
           path: build-root/docs/
           retention-days: 7
