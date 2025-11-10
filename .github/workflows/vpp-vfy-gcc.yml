@@ -87,10 +87,10 @@ jobs:
       - name: Actions Checkout
         uses: actions/checkout@v5
 
-      - name: "Show Nomad Attributes"
-        uses: pmikus/.github/.github/actions/show-nomad-attributes@main
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
-      - name: "Show Nomad Dockerfile"
+      - name: Show Nomad Dockerfile
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
       - name: Restore VPP Gerrit Environment Variables
@@ -108,9 +108,6 @@ jobs:
           ref: refs/heads/${{ env.GERRIT_BRANCH }}
           fetch-depth: 0
           delay: "0s"
-
-      - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
       - name: Setup Docker VPP Runtime Environment for 'make test'
         uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master

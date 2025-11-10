@@ -44,8 +44,8 @@ jobs:
       - name: Actions Checkout
         uses: actions/checkout@v5
 
-      - name: "Show Nomad Attributes"
-        uses: pmikus/.github/.github/actions/show-nomad-attributes@main
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
       - name: "Show Nomad Dockerfile"
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
@@ -65,9 +65,6 @@ jobs:
           ref: refs/heads/${{ env.GERRIT_BRANCH }}
           fetch-depth: 0
           delay: "0s"
-
-      - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
       - name: Make Docs
         run: |

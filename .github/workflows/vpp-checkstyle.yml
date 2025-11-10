@@ -80,6 +80,7 @@ jobs:
       TUI_LINE: "*******************************************************************"
 
     steps:
+<<<<<<< HEAD
       - name: Debug GitHub Event Workflow Run
         run: |
           echo "=== Full workflow_run event ==="
@@ -114,9 +115,14 @@ jobs:
       - name: "Show Nomad Dockerfile"
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
+=======
+>>>>>>> 3d577122d (ci(gha): Merge reusable action that are similar)
       - name: Setup Environment
         id: setup-executor-env
         uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: "Show Nomad Dockerfile"
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
       - name: Checkpoint VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-checkpoint@main
