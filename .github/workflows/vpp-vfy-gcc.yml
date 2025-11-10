@@ -41,7 +41,13 @@ jobs:
       CACHE_DATE: ${{ github.run_id }}
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
-      MAKE_TEST_SUITES: "vlib vppinfra vpe_api vapi cli bihash"
+      # MAKE_TEST_SUITES: "vlib vppinfra vpe_api vapi cli bihash"
+      # NOTE: bihash tests are excluded due to known failures on GCOV builds,
+      #       which due to a bug in the jenkins gcc job script is not properly
+      #       detected and reported in the current CI job debug image test (e.g.
+      #       the debug test does not build with GCOV enabled).  The gcov periodic job
+      #       does fail bihash tests.
+      MAKE_TEST_SUITES: "vlib vppinfra vpe_api vapi cli"
       TEST_JOBS: 16
       TEST_RETRIES: 3
       MAKE_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04'  }}

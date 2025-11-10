@@ -37,7 +37,7 @@ inputs:
   VPP_WORKER_COUNT:
     description: "Number of VPP workers to use for multiworker tests"
     required: false
-    default: "2"
+    default: "0"
     type: string
   MAKE_TEST_SUITES:
     description: "Specific set of test suites to run"

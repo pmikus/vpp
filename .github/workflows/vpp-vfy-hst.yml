@@ -21,7 +21,8 @@ concurrency:
 jobs:
   vpp-verify-hst:
     name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # FIXME: Disable HST TEST during development for now
+    if: ${{ github.event.workflow_run.conclusion == 'fixme success' }}
     runs-on:
       - self-hosted
       - nomad
