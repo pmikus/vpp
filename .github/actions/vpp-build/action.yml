@@ -4,6 +4,10 @@ description: |
   This GitHub Action builds the VPP Docker image.
 
 inputs:
+  WORKSPACE:
+    description: "Workspace directory where VPP is located"
+    required: true
+    type: string
   MAKE_PARALLEL_JOBS:
     description: "Number of parallel jobs for 'make' (overrides MAKE_PARALLEL_JOBS)"
     required: false
@@ -11,8 +15,7 @@ inputs:
     type: string
   BUILD_TYPE:
     description: "Type of build: debug (dbg) or release (rel)"
-    required: false
-    default: "rel"
+    required: true
     type: string
   BUILD_HST:
     description: "Build VPP for HostStack Test (HST) framework"
@@ -36,6 +39,7 @@ runs:
     - name: Build VPP
       shell: bash
       env:
+        WORKSPACE: ${{ inputs.WORKSPACE }}
         MAKE_PARALLEL_JOBS: ${{ inputs.MAKE_PARALLEL_JOBS }}
         BUILD_TYPE: ${{ inputs.BUILD_TYPE }}
         BUILD_HST: ${{ inputs.BUILD_HST }}
@@ -43,6 +47,7 @@ runs:
         TUI_LINE: ${{ inputs.TUI_LINE }}
       run: |
         set -euo pipefail
+        cd "${WORKSPACE}"
 
         if [ "$USE_GCC" == "true" ] ; then
             BUILD_RESULT="(GCC) "
@@ -114,6 +119,5 @@ runs:
             BUILD_RESULT="${BUILD_ERROR}"
             RETVAL="1"
         fi
-        echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^}" \
-                "BUILD $BUILD_RESULT\n$TUI_LINE\n"
+        echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^} BUILD $BUILD_RESULT\n$TUI_LINE\n"
         exit $RETVAL

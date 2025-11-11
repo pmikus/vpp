@@ -19,10 +19,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  vpp-verify-hst:
+  vpp-vfy-hst:
     name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
-    # FIXME: Disable HST TEST during development for now
-    if: ${{ github.event.workflow_run.conclusion == 'fixme success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
       - self-hosted
       - nomad
@@ -38,23 +37,28 @@ jobs:
         executor_arch: ['x86_64', 'aarch64']
         build_type: ['dbg', 'rel']
         exclude:
-          # Exclude ubuntu2404 OS for all builds on aarch64
+          # Exclude all ubuntu2404 on aarch64
           - os: 'ubuntu2404'
             executor_arch: 'aarch64'
-          # Exclude release build ubuntu2404 OS on all architectures
-          - build_type: 'release'
-            os: 'ubuntu2404'
+          # Exclude all release builds on ubuntu2404
+          - os: 'ubuntu2404'
+            build_type: 'rel'
+          # Exclude release builds on aarch64 (ubuntu2204 only, since ubuntu2404+aarch64 already excluded)
+          - os: 'ubuntu2204'
+            executor_arch: 'aarch64'
+            build_type: 'rel'
 
     env:
-      CACHE_DATE: ${{ github.run_id }}
+      WORKSPACE: /scratch/docker-build/vpp
+      HS_TEST_DIR: /scratch/docker-build/vpp/test-c/hs-test
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
-      WORKSPACE: ${{ github.workspace }}
-      HS_TEST_DIR: ${{ github.workspace }}/test-c/hs-test
       GERRIT_BRANCH: ""
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
       GERRIT_REFSPEC: ""
+      GERRIT_CHANGE_NUMBER: ""
+      GERRIT_PATCHSET_NUMBER: ""
       TUI_LINE: "*******************************************************************"
 
     steps:
@@ -72,37 +76,46 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Gerrit Checkout
-        # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
         with:
-          gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
-          gerrit-project: ${{ env.GERRIT_PROJECT }}
-          gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
-          ref: refs/heads/${{ env.GERRIT_BRANCH }}
-          fetch-depth: 0
-          delay: "0s"
-
-      - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup-executor-env@main
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Install VPP dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Install VPP external dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: HST VPP Build
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
+          WORKSPACE: ${{ env.WORKSPACE }}
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
           BUILD_TYPE: ${{ matrix['build_type'] }}
           BUILD_HST: 'true'
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: HST Test VPP
         uses: pmikus/vpp/.github/actions/vpp-hst-test@master
         timeout-minutes: 60
         with:
+          WORKSPACE: ${{ env.WORKSPACE }}
           BUILD_TYPE: ${{ matrix['build_type'] }}
           HS_TEST_DIR: ${{ env.HS_TEST_DIR }}
           TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Verify HST passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP Verify HST workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"

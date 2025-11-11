@@ -1,4 +1,4 @@
-name: vpp-merge-make-test
+name: vpp-mrg-mktst
 
 on:
   workflow_dispatch:
@@ -60,7 +60,7 @@ permissions:
   actions: read
 
 jobs:
-  vpp-merge-make-test:
+  vpp-mrg-mktst:
     name: ${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-${{ matrix.build_type }}-${{ matrix.os }}-${{ matrix.executor_arch }}
     if: ${{ inputs.GERRIT_EVENT_TYPE == 'change-merged' }}
     runs-on:
@@ -83,9 +83,9 @@ jobs:
             executor_arch: 'aarch64'
 
     env:
-      BUILD_TYPE: ${{ matrix.build_type }}
-      CACHE_DATE: ${{ github.run_id }}
+      WORKSPACE: /scratch/docker-build/vpp
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
+      BUILD_TYPE: ${{ matrix.build_type }}
       MAKE_PARALLEL_JOBS: 16
       TEST_JOBS: 16
       TEST_RETRIES: 3
@@ -93,7 +93,6 @@ jobs:
       MAKE_TEST_MULTIWORKER_OS: 'debian-12'
       VPPAPIGEN_TEST_OS: ${{ matrix.os == 'ubuntu2204' && 'ubuntu-22.04' || 'ubuntu-24.04' }}
       SHM_SIZE: ${{ matrix.executor_arch == 'aarch64' && '4096M' || '2048M' }}
-      WORKSPACE: ${{ github.workspace }}
       GERRIT_BRANCH: ""
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
@@ -110,38 +109,55 @@ jobs:
       - name: Show Nomad Dockerfile
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
 
-      - name: Gerrit Checkout
-        # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
         with:
-          gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
-          gerrit-project: ${{ env.GERRIT_PROJECT }}
-          gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
-          fetch-depth: 0
-          delay: "0s"
-
-      - name: Setup Docker VPP Runtime Environment for 'make test'
-        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Install VPP dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Install VPP external dependencies
         uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Build VPP
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
+          WORKSPACE: ${{ env.WORKSPACE }}
           MAKE_PARALLEL_JOBS: ${{ env.MAKE_PARALLEL_JOBS }}
           BUILD_TYPE: ${{ env.BUILD_TYPE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Setup Docker VPP Runtime Environment for 'make test'
+        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          SHM_SIZE: ${{ env.SHM_SIZE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: VPP Make Test
         uses: pmikus/vpp/.github/actions/vpp-make-test@master
         timeout-minutes: 75
         with:
+          WORKSPACE: ${{ env.WORKSPACE }}
           TEST_JOBS: ${{ env.TEST_JOBS }}
+          TEST_RETRIES: ${{ env.TEST_RETRIES }}
           MAKE_TEST_OS: ${{ env.MAKE_TEST_OS }}
           MAKE_TEST_MULTIWORKER_OS: ${{ env.MAKE_TEST_MULTIWORKER_OS }}
           VPPAPIGEN_TEST_OS: ${{ env.VPPAPIGEN_TEST_OS }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
-
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Merge Make Test passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP Merge Make Test workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"

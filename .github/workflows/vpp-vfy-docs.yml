@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  vpp-verify-docs:
+  vpp-vfy-docs:
     name: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-rel-ubuntu2404-x86_64
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on:
@@ -31,7 +31,7 @@ jobs:
       - fdio:os=ubuntu2404
 
     env:
-      WORKSPACE: ${{ github.workspace }}
+      WORKSPACE: /scratch/docker-build/vpp
       GERRIT_BRANCH: ""
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
@@ -55,26 +55,30 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Gerrit Checkout
-        # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
         with:
-          gerrit-refspec: ${{ env.GERRIT_REFSPEC }}
-          gerrit-project: ${{ env.GERRIT_PROJECT }}
-          gerrit-url: ${{ env.GERRIT_CHANGE_URL }}
-          ref: refs/heads/${{ env.GERRIT_BRANCH }}
-          fetch-depth: 0
-          delay: "0s"
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Make Docs
         run: |
           set -euo pipefail
+          cd $WORKSPACE
           make docs
 
       - name: Upload Documentation Artifacts
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: vpp-docs-${{ env.GERRIT_BRANCH }}-${{ env.GERRIT_CHANGE_NUMBER }}-${{ env.GERRIT_PATCHSET_NUMBER }}
-          path: build-root/docs/
+          name: vpp-vfy-docs-${{ env.GERRIT_BRANCH }}-rel-ubuntu2404-x86_64-${{ env.GERRIT_CHANGE_NUMBER }}-${{ env.GERRIT_PATCHSET_NUMBER }}
+          path: ${{ env.WORKSPACE }}/build-root/docs/
           retention-days: 7
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Verify Docs passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP Verify Docs workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"

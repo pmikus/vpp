@@ -4,6 +4,10 @@ description: |
   This GitHub Action installs external dependencies for VPP on the self-hosted runner.
 
 inputs:
+  WORKSPACE:
+    description: "Workspace directory where VPP is located"
+    required: true
+    type: string
   TUI_LINE:
     description: "Delimiter line for TUI output"
     required: false
@@ -66,9 +70,13 @@ runs:
 
     - name: VPP Install External Dependencies
       shell: bash
+      env:
+        WORKSPACE: ${{ inputs.WORKSPACE }}
+        TUI_LINE: ${{ inputs.TUI_LINE }}
       id: vpp-install-ext-deps
       run: |
         set -euo pipefail
-        echo "${{ inputs.TUI_LINE }}"
+        cd "$WORKSPACE"
+        echo -e "$TUI_LINE\nInstalling VPP external dependencies...\n"
         make UNATTENDED=yes install-ext-deps
-        echo "${{ inputs.TUI_LINE }}"
+        echo "$TUI_LINE"

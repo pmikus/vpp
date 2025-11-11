@@ -66,7 +66,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checkstyle:
+  vpp-checkstyle:
     name: ${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-rel-ubuntu2404-x86_64
     if: ${{ inputs.GERRIT_EVENT_TYPE == 'patchset-created' }}
     runs-on:
@@ -76,40 +76,15 @@ jobs:
       - fdio:class=builder
       - fdio:namespace=sandbox
       - fdio:os=ubuntu2404
+
     env:
+      WORKSPACE: /scratch/docker-build/vpp
       TUI_LINE: "*******************************************************************"
 
     steps:
-      - name: Debug GitHub Event Workflow Run
-        run: |
-          echo "=== Full workflow_run event ==="
-          echo '${{ toJSON(github.event.workflow_run) }}'
-          echo ""
-          echo "=== Specific fields ==="
-          echo "head_branch: '${{ github.event.workflow_run.head_branch }}'"
-          echo "head_sha: '${{ github.event.workflow_run.head_sha }}'"
-          echo "name: '${{ github.event.workflow_run.name }}'"
-          echo "id: '${{ github.event.workflow_run.id }}'"
-          echo ""
-          echo "=== Head repository ==="
-          echo '${{ toJSON(github.event.workflow_run.head_repository) }}'
-          echo ""
-          echo "=== Head commit ==="
-          echo '${{ toJSON(github.event.workflow_run.head_commit) }}'
-          echo "=== GitHub Context ==="
-          echo '${{ toJSON(github) }}'
-          echo ""
-          echo "=== GitHub Event Context ==="
-          echo '${{ toJSON(github.event) }}'
-          echo ""
-          echo "=== GitHub Event Workflow Run ==="
-          echo '${{ toJSON(github.event.workflow_run) }}'
-          echo ""
-          echo "=== Environment Variables ==="
-          env | sort
-
-      - name: "Show Nomad Attributes"
-        uses: pmikus/.github/.github/actions/show-nomad-attributes@main
+      - name: Setup Environment
+        id: setup-executor-env
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
 
       - name: "Show Nomad Dockerfile"
         uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
@@ -117,22 +92,18 @@ jobs:
       - name: Checkpoint VPP Gerrit Environment Variables
         uses: pmikus/.github/.github/actions/gerrit-env-vars-checkpoint@main
 
-      - name: Gerrit Checkout
-        # yamllint disable-line rule:line-length
-        uses: lfreleng-actions/checkout-gerrit-change-action@54d751e8bd167bc91f7d665dabe33fae87aaaa63 # v0.9
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
         with:
-          gerrit-refspec: ${{ inputs.GERRIT_REFSPEC }}
-          gerrit-project: ${{ inputs.GERRIT_PROJECT }}
-          gerrit-url: ${{ inputs.GERRIT_CHANGE_URL }}
-          ref: refs/heads/${{ inputs.GERRIT_BRANCH }}
-
-      - name: Retrieve GIT commit message
-        # yamllint disable-line rule:line-length
-        uses: lfit/releng-reusable-workflows/.github/actions/git-commit-message-action@main
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Run Checkstyle Scripts
         run: |
           set -euxo pipefail
+          cd $WORKSPACE
           BUILD_EXT_DIR="build/external"
           MATRIX_FILE="$BUILD_EXT_DIR/mlx_rdma_dpdk_matrix.txt"
           PKGS_DIR="$BUILD_EXT_DIR/packages"
@@ -151,51 +122,54 @@ jobs:
 
           make UNATTENDED=yes checkstyle
 
-      # - name: Run Test Checkstyle Scripts
-      #   run: |
-      #     set -euo pipefail
-      #     make test-checkstyle
+      - name: Run Test Checkstyle Scripts
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          make test-checkstyle
 
-      # - name: Run API Checkstyle Scripts
-      #   run: |
-      #     set -euo pipefail
-      #     VPP_CRC_CHECKER="extras/scripts/crcchecker.py"
-      #     VPP_CRC_CHECKER_CMD="$VPP_CRC_CHECKER --check-patchset"
+      - name: Run API Checkstyle Scripts
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          VPP_CRC_CHECKER="extras/scripts/crcchecker.py"
+          VPP_CRC_CHECKER_CMD="$VPP_CRC_CHECKER --check-patchset"
 
-      #     # API checker complains if the git repo is not clean.
-      #     # Help diagnosing those issues easier
-      #     git --no-pager diff
-      #     echo "Running $VPP_CRC_CHECKER_CMD"
-      #     if $VPP_CRC_CHECKER_CMD; then
-      #         echo "API check successful"
-      #     else
-      #         RET_CODE=$?
-      #         echo "API check failed: ret code $RET_CODE; please read https://wiki.fd.io/view/VPP/ApiChangeProcess and discuss with ayourtch@gmail.com if unsure how to proceed"
-      #         echo "::error file=.ci/scripts/vpp/crcchecker.py,line=1::API check FAILED for $GITHUB_REF. See run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-      #         exit $RET_CODE
-      #     fi
+          # API checker complains if the git repo is not clean.
+          # Help diagnosing those issues easier
+          git --no-pager diff
+          echo "Running $VPP_CRC_CHECKER_CMD"
+          if $VPP_CRC_CHECKER_CMD; then
+              echo "API check successful"
+          else
+              RET_CODE=$?
+              echo "API check failed: ret code $RET_CODE; please read https://wiki.fd.io/view/VPP/ApiChangeProcess and discuss with ayourtch@gmail.com if unsure how to proceed"
+              echo "::error file=.ci/scripts/vpp/crcchecker.py,line=1::API check FAILED for $GITHUB_REF. See run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+              exit $RET_CODE
+          fi
 
-      # - name: Run Commit Message Checkstyle
-      #   run: |
-      #     set -euo pipefail
-      #     echo "Running extras/scripts/check_commit_msg.sh"
-      #     extras/scripts/check_commit_msg.sh
+      - name: Run Commit Message Checkstyle
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          echo "Running extras/scripts/check_commit_msg.sh"
+          extras/scripts/check_commit_msg.sh
 
-
-      # - name: Run Docs Spell
-      #   run: |
-      #     set -euo pipefail
-      #     make docs-spell
+      - name: Run Docs Spell
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          make docs-spell
 
       - name: Archive Checkstyle Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkstyle-logs-${{ inputs.GERRIT_BRANCH }}-${{ matrix.os }}
+          name: vpp-checkstyle-logs-${{ inputs.GERRIT_BRANCH }}-rel-ubuntu2404-x86_64-${{ env.GERRIT_CHANGE_NUMBER }}-${{ env.GERRIT_PATCHSET_NUMBER }}
           path: logs/
 
       - name: Report Success
         if: success()
         run: |
-          echo "Checkstyle passed for ${{ inputs.GERRIT_BRANCH }} on ${{ matrix.os }}"
-          echo "::notice::Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Repository: ${{ github.repository }}, Branch: ${{ inputs.GERRIT_BRANCH }}"
+          echo "VPP Checkstyle passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP Checkstyle workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"
