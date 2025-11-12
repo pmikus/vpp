@@ -1,0 +1,102 @@
+name: vpp-vfy-cov
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: required-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  vpp-vfy-cov:
+    name: ${{ github.workflow }}-ubuntu2404-x86_64
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=x86_64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+
+    env:
+      WORKSPACE: /scratch/docker-build/vpp
+      MAKE_PARALLEL_JOBS: 16
+      TEST_JOBS: 16
+      TEST_RETRIES: 3
+      MAKE_TEST_OS: ubuntu-24.04
+      VPPAPIGEN_TEST_OS: ubuntu-24.04
+      SHM_SIZE: 2048M
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: Show Nomad Dockerfile
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Pull VPP master HEAD
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          git checkout master
+          git pull
+          git show --stat
+
+      - name: Install VPP dependencies
+        uses: pmikus/vpp/.github/actions/vpp-install-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Install VPP external dependencies
+        uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Setup Docker VPP Runtime Environment for 'make test'
+        uses: pmikus/vpp/.github/actions/vpp-docker-runtime-setup@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          SHM_SIZE: ${{ env.SHM_SIZE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: VPP Make Coverage Test
+        run: |
+          set -euo pipefail
+          BUILD_ERROR=""
+          BUILD_RESULT="MAKE TEST COVERAGE SUCCESSFULLY COMPLETED"
+          RETVAL="0"
+
+          cd $WORKSPACE
+          if ! make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS CCACHE_DISABLE=1 test-cov-both ; then
+              BUILD_ERROR="FAILED 'make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS CCACHE_DISABLE=1 test-cov-both'"
+          fi
+          if [ -n "$BUILD_ERROR" ] ; then
+              BUILD_RESULT="$BUILD_ERROR"
+              RETVAL="1"
+          fi
+          echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^} BUILD " \
+                  "\n* $BUILD_RESULT\n$TUI_LINE\n"
+          exit $RETVAL
+
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Verify Coverage passed"
+          echo "::notice::VPP Verify Coverage workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: master, Git commit: HEAD"
