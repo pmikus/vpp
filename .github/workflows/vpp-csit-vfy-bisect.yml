@@ -1,0 +1,149 @@
+name: vpp-csit-vfy-bisect
+
+on:
+  workflow_dispatch:
+    inputs:
+      GERRIT_BRANCH:
+        description: "Branch that change is against"
+        required: true
+        type: string
+      GERRIT_CHANGE_ID:
+        description: "The ID for the change"
+        required: true
+        type: string
+      GERRIT_CHANGE_NUMBER:
+        description: "The Gerrit number"
+        required: true
+        type: string
+      GERRIT_CHANGE_URL:
+        description: "URL to the change"
+        required: true
+        type: string
+      GERRIT_EVENT_TYPE:
+        description: "Type of Gerrit event"
+        required: true
+        type: string
+      GERRIT_PATCHSET_NUMBER:
+        description: "The patch number for the change"
+        required: true
+        type: string
+      GERRIT_PATCHSET_REVISION:
+        description: "The revision sha"
+        required: true
+        type: string
+      GERRIT_PROJECT:
+        description: "Project in Gerrit"
+        required: true
+        type: string
+      GERRIT_REFSPEC:
+        description: "Gerrit refspec of change"
+        required: true
+        type: string
+      TESTBED_ARCH:
+        description: "Testbed architecture to run tests on"
+        required: true
+        type: string
+
+env:
+  GERRIT_BRANCH: ${{ inputs.GERRIT_BRANCH }}
+  GERRIT_CHANGE_ID: ${{ inputs.GERRIT_CHANGE_ID }}
+  GERRIT_CHANGE_NUMBER: ${{ inputs.GERRIT_CHANGE_NUMBER }}
+  GERRIT_CHANGE_URL: ${{ inputs.GERRIT_CHANGE_URL }}
+  GERRIT_EVENT_TYPE: ${{ inputs.GERRIT_EVENT_TYPE }}
+  GERRIT_PATCHSET_NUMBER: ${{ inputs.GERRIT_PATCHSET_NUMBER }}
+  GERRIT_PATCHSET_REVISION: ${{ inputs.GERRIT_PATCHSET_REVISION }}
+  GERRIT_PROJECT: ${{ inputs.GERRIT_PROJECT }}
+  GERRIT_REFSPEC: ${{ inputs.GERRIT_REFSPEC }}
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # yamllint disable-line rule:line-length
+  group: required-${{ github.workflow }}-rel-ubuntu2404-x86_64-${{ inputs.GERRIT_CHANGE_NUMBER }}-${{ inputs.GERRIT_PATCHSET_NUMBER }}
+  cancel-in-progress: true
+
+jobs:
+  vpp-csit-vfy-bisect:
+    name: ${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-ubuntu2404-x86_64
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=x86_64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+      - fdio:testbed-arch=${{ matrix.testbed-arch }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        testbed-arch:
+          - '2n-grc'
+          - '2n-icx'
+          - '2n-spr'
+          - '2n-zn2'
+          - '3n-icx'
+          - '3n-alt'
+          - '3n-snr'
+          - '3n-icxd'
+          - '3n-oct'
+          - '3na-spr'
+          - '3nb-spr'
+          - '2n-emr'
+          - '3n-emr'
+
+    env:
+      WORKSPACE: /scratch/docker-build/vpp
+      CSIT_DIR: /scratch/docker-build/csit
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Check if testbed matches
+        if: ${{ inputs.TESTBED_ARCH == matrix.testbed-arch }}
+        run: echo "Running for ${{ matrix.testbed-arch }}"
+
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: "Show Nomad Dockerfile"
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Run CSIT bisect.sh
+        run: |
+          set -euxo pipefail
+          export JOB_NAME=${{ github.workflow }}-${{ inputs.GERRIT_BRANCH }}-ubuntu2404-x86_64-${{ matrix.testbed-arch }}
+
+          # Checkout CSIT HEAD
+          cd $CSIT_DIR
+          git checkout HEAD
+
+          # Run bisect.sh from CSIT
+          cd $WORKSPACE
+          # TODO: fix csit bash scripts to not rely on CSIT_DIR being inside WORKSPACE
+          NEW_CSIT_DIR="$WORKSPACE/$(basename $CSIT_DIR)"
+          mv $CSIT_DIR $NEW_CSIT_DIR
+          csit_entry_dir="$NEW_CSIT_DIR/resources/libraries/bash/entry"
+          echo 'source "${csit_entry_dir}/with_oper_for_vpp.sh" "bisect.sh"' # FIXME: replace with actual sourcing
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP CSIT Bisect passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP CSIT Bisect workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"
