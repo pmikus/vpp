@@ -1,0 +1,81 @@
+name: vpp-vfy-dpdk-rdma-ver
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs daily at 2am UTC
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: required-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  vpp-vfy-gcov:
+    name: ${{ github.workflow }}-ubuntu2404-x86_64
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=x86_64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+
+    env:
+      WORKSPACE: /scratch/docker-build/vpp
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: Show Nomad Dockerfile
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Pull VPP master HEAD
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          git checkout master
+          git pull
+          git show --stat
+
+      - name: Install VPP dependencies
+        uses: pmikus/vpp/.github/actions/vpp-install-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: VPP Make Coverage Test
+        run: |
+          set -euo pipefail
+
+          EXTERNAL_BUILD_DIR="$WORKSPACE/build/external"
+          RETVAL="0"
+          MISMATCH_RESULT="INCLUDED IN"
+
+          make -C "$EXTERNAL_BUILD_DIR" build-deb
+          source "$EXTERNAL_BUILD_DIR/dpdk_mlx_default.sh" || true
+
+          if [ "${DPDK_MLX_DEFAULT-}" = "n" ] ; then
+              MISMATCH_RESULT="MISSING FROM"
+              RETVAL="1"
+          fi
+          echo -e "\n$TUI_LINE\n* MLX DPDK DRIVER $MISMATCH_RESULT VPP-EXT-DEPS PACKAGE\n$TUI_LINE\n"
+          exit $RETVAL
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Verify DPDK RDMA Version passed"
+          echo "::notice::VPP Verify DPDK RDMA Version workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: master, Git commit: HEAD"
