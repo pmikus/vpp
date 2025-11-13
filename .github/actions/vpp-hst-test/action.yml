@@ -75,7 +75,8 @@ runs:
               return 0
           }
 
-          /sbin/init --log-level=err
+          find / -name start-docker.sh
+          start-docker.sh
           check_for_core_files || true
           if [ "${{ inputs.BUILD_TYPE }}" == "dbg" ] ; then
               hst_debug_build_run || true
