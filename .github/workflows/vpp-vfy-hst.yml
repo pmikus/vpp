@@ -105,7 +105,14 @@ jobs:
           BUILD_HST: 'true'
           TUI_LINE: ${{ env.TUI_LINE }}
 
+      - name: Start Docker Daemon
+        uses: pmikus/vpp/.github/actions/vpp-start-docker@master
+        with:
+          START_DOCKER_SCRIPT: start-docker.sh
+          TUI_LINE: ${{ env.TUI_LINE }}
+
       - name: HST Test VPP
+        if: success()
         uses: pmikus/vpp/.github/actions/vpp-hst-test@master
         timeout-minutes: 60
         with:

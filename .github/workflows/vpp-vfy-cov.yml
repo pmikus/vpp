@@ -75,7 +75,14 @@ jobs:
           SHM_SIZE: ${{ env.SHM_SIZE }}
           TUI_LINE: ${{ env.TUI_LINE }}
 
+      - name: Start Docker Daemon
+        uses: pmikus/vpp/.github/actions/vpp-start-docker@master
+        with:
+          START_DOCKER_SCRIPT: start-docker.sh
+          TUI_LINE: ${{ env.TUI_LINE }}
+
       - name: VPP Make Coverage Test
+        if: success()
         run: |
           set -euo pipefail
           BUILD_ERROR=""
