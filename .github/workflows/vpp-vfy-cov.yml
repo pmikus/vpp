@@ -83,6 +83,8 @@ jobs:
           RETVAL="0"
 
           cd $WORKSPACE
+          find / -name start-docker.sh
+          start-docker.sh
           if ! make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS CCACHE_DISABLE=1 test-cov-both ; then
               BUILD_ERROR="FAILED 'make COMPRESS_FAILED_TEST_LOGS=yes TEST_JOBS=$TEST_JOBS CCACHE_DISABLE=1 test-cov-both'"
           fi
