@@ -1,0 +1,111 @@
+name: vpp-vfy-arm-drvrs
+
+on:
+  workflow_run:
+    workflows: ["vpp-checkstyle"]
+    types:
+      - completed
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: required-${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  vpp-vfy-arm-drvrs:
+    name: ${{ github.workflow }}-master-rel-ubuntu2404-aarch64
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on:
+      - self-hosted
+      - nomad
+      - fdio:arch=aarch64
+      - fdio:class=builder
+      - fdio:namespace=sandbox
+      - fdio:os=ubuntu2404
+
+    env:
+      WORKSPACE: /scratch/docker-build/vpp
+      CCACHE_DIR: /scratch/ccache/ubuntu2404-aarch64
+      MAKE_PARALLEL_JOBS: 16
+      GERRIT_BRANCH: ""
+      GERRIT_CHANGE_URL: ""
+      GERRIT_PROJECT: ""
+      GERRIT_REFSPEC: ""
+      GERRIT_CHANGE_NUMBER: ""
+      GERRIT_PATCHSET_NUMBER: ""
+      TUI_LINE: "*******************************************************************"
+
+    steps:
+      - name: Actions Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Environment
+        uses: pmikus/.github/.github/actions/setup-executor-env@main
+
+      - name: Show Nomad Dockerfile
+        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+
+      - name: Restore VPP Gerrit Environment Variables
+        uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout VPP Gerrit Change
+        uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          GERRIT_BRANCH: ${{ env.GERRIT_BRANCH }}
+          GERRIT_REFSPEC: ${{ env.GERRIT_REFSPEC }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Install VPP dependencies
+        uses: pmikus/vpp/.github/actions/vpp-install-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Install VPP external dependencies
+        uses: pmikus/vpp/.github/actions/vpp-install-ext-deps@master
+        with:
+          WORKSPACE: ${{ env.WORKSPACE }}
+          TUI_LINE: ${{ env.TUI_LINE }}
+
+      - name: Build VPP ARM Drivers
+        run: |
+          set -euxo pipefail
+          cd $WORKSPACE
+          BUILD_RESULT="* SUCCESSFULLY COMPLETED"
+          BUILD_ERROR=""
+          RETVAL="0"
+
+          make_pkg_verify_arm_driver() {
+              vpp_platform="$1"
+              git clean -fdx || true
+              if ! make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} pkg-verify VPP_PLATFORM="$vpp_platform"; then
+                  BUILD_ERROR+="* FAILED 'make UNATTENDED=yes MAKE_PARALLEL_JOBS=${MAKE_PARALLEL_JOBS} pkg-verify VPP_PLATFORM=$vpp_platform'\n"
+              fi
+          }
+
+          make_pkg_verify_arm_driver cn913x
+          make_pkg_verify_arm_driver octeon9
+          make_pkg_verify_arm_driver octeon10
+
+          if [ -n "$BUILD_ERROR" ] ; then
+              BUILD_RESULT="$BUILD_ERROR"
+              RETVAL="1"
+          fi
+          echo -e "\n$TUI_LINE\n* VPP ${OS_ID^^}-${OS_VERSION_ID}-${OS_ARCH^^} ARM DRIVERS BUILD\n$BUILD_RESULT\n$TUI_LINE\n"
+          exit "$RETVAL"
+
+      - name: Report Success
+        if: success()
+        run: |
+          echo "VPP Verify ARM Drivers passed for Gerrit Refspec: $GERRIT_REFSPEC, Gerrit Change URL: $GERRIT_CHANGE_URL"
+          echo "::notice::VPP Verify ARM Drivers workflow completed successfully! Workflow ID: ${{ github.run_id }}, Name: ${{ github.workflow }}, Branch: $GERRIT_BRANCH, Change: $GERRIT_CHANGE_NUMBER, Patchset: $GERRIT_PATCHSET_NUMBER"
