@@ -97,7 +97,7 @@ jobs:
           WORKSPACE: ${{ env.WORKSPACE }}
           TUI_LINE: ${{ env.TUI_LINE }}
 
-      - name: Build VPP
+      - name: Build VPP with GCC/GCOV
         uses: pmikus/vpp/.github/actions/vpp-build@master
         with:
           WORKSPACE: ${{ env.WORKSPACE }}
@@ -113,9 +113,9 @@ jobs:
           SHM_SIZE: ${{ env.SHM_SIZE }}
           TUI_LINE: ${{ env.TUI_LINE }}
 
-      - name: VPP Make Test
+      - name: VPP Make Test with GCC/GCOV
         uses: pmikus/vpp/.github/actions/vpp-make-test@master
-        timeout-minutes: 60
+        timeout-minutes: 90
         with:
           WORKSPACE: ${{ env.WORKSPACE }}
           BUILD_TYPE: ${{ matrix['build_type'] }}

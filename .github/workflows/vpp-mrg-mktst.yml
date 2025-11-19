@@ -151,7 +151,6 @@ jobs:
 
       - name: VPP Make Test
         uses: pmikus/vpp/.github/actions/vpp-make-test@master
-        timeout-minutes: 75
         with:
           WORKSPACE: ${{ env.WORKSPACE }}
           TEST_JOBS: ${{ env.TEST_JOBS }}

@@ -57,6 +57,7 @@ jobs:
           TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: VPP Make Coverage Test
+        timeout-minutes: 90
         run: |
           set -euo pipefail
 

@@ -30,6 +30,8 @@ jobs:
       - fdio:namespace=sandbox
       - fdio:os=${{ matrix.os }}
 
+    # TODO: modify the self-hosted agent to ensure hst class workflows are placed on nomad clients
+    #       one at a time or on a per numa node basis to avoid resource contention
     strategy:
       fail-fast: false
       matrix:
@@ -53,6 +55,7 @@ jobs:
       HS_TEST_DIR: /scratch/docker-build/vpp/test-c/hs-test
       CCACHE_DIR: /scratch/ccache/${{ matrix.os }}-${{ matrix.executor_arch }}
       MAKE_PARALLEL_JOBS: 16
+      TEST_JOBS: 16
       GERRIT_BRANCH: ""
       GERRIT_CHANGE_URL: ""
       GERRIT_PROJECT: ""
@@ -114,11 +117,12 @@ jobs:
       - name: HST Test VPP
         if: success()
         uses: pmikus/vpp/.github/actions/vpp-hst-test@master
-        timeout-minutes: 60
+        timeout-minutes: 90
         with:
           WORKSPACE: ${{ env.WORKSPACE }}
           BUILD_TYPE: ${{ matrix['build_type'] }}
           HS_TEST_DIR: ${{ env.HS_TEST_DIR }}
+          TEST_JOBS: ${{ env.TEST_JOBS }}
           TUI_LINE: ${{ env.TUI_LINE }}
 
       - name: Report Success
