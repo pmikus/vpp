@@ -46,13 +46,16 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup-executor-env@main
+        # yamllint disable-line rule:line-length
+        uses: fdio/.github/.github/actions/setup-executor-env@b728d1589228e2891a4241a1bba362d76895c225
 
       - name: "Show Nomad Dockerfile"
-        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+        # yamllint disable-line rule:line-length
+        uses: fdio/.github/.github/actions/show-nomad-dockerfile@b728d1589228e2891a4241a1bba362d76895c225
 
       - name: Restore VPP Gerrit Environment Variables
-        uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@main
+        # yamllint disable-line rule:line-length
+        uses: pmikus/.github/.github/actions/gerrit-env-vars-restore@b728d1589228e2891a4241a1bba362d76895c225
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

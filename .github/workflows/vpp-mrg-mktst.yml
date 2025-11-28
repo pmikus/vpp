@@ -109,10 +109,12 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Setup Environment
-        uses: pmikus/.github/.github/actions/setup-executor-env@main
+        # yamllint disable-line rule:line-length
+        uses: fdio/.github/.github/actions/setup-executor-env@b728d1589228e2891a4241a1bba362d76895c225
 
       - name: Show Nomad Dockerfile
-        uses: pmikus/.github/.github/actions/show-nomad-dockerfile@main
+        # yamllint disable-line rule:line-length
+        uses: fdio/.github/.github/actions/show-nomad-dockerfile@b728d1589228e2891a4241a1bba362d76895c225
 
       - name: Checkout VPP Gerrit Change
         uses: pmikus/vpp/.github/actions/vpp-checkout-gerrit-change@master
