@@ -27,7 +27,7 @@ jobs:
       - nomad
       - fdio:arch=${{ matrix.executor_arch }}
       - fdio:class=hst
-      - fdio:namespace=sandbox
+      - fdio:namespace=dev
       - fdio:os=${{ matrix.os }}
 
     # TODO: modify the self-hosted agent to ensure hst class workflows are placed on nomad clients
