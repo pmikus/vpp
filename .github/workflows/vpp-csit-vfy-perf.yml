@@ -90,7 +90,6 @@ jobs:
           - '2n-zn2'
           - '3n-icx'
           - '3n-alt'
-          - '3n-snr'
           - '3n-icxd'
           - '3n-oct'
           - '3na-spr'
