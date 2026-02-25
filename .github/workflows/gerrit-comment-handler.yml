@@ -9,8 +9,7 @@ on:
         required: false
         type: choice
         options:
-          - sandbox
-          - prod
+          - dev
         default: prod
       GERRIT_BRANCH:
         description: "Branch that change is against"
@@ -109,7 +108,7 @@ jobs:
       - fdio:arch=${{ matrix.executor_arch }}
       - fdio:class=builder
       - fdio:size=csit
-      - fdio:namespace=${{ inputs.FDIO_NAMESPACE || 'prod' }}
+      - fdio:namespace=${{ inputs.FDIO_NAMESPACE || 'dev' }}
       - fdio:os=${{ matrix.os }}
       - fdio:workflow=${{ github.run_id }}
     timeout-minutes: 1440
@@ -157,42 +156,42 @@ jobs:
           fetch-depth: 0
           fetch-tags: 'true'
 
-      - name: Run CSIT Bootstrap
-        uses: fdio/csit/.github/actions/csit-bootstrap@6e2e8dd6eae1a9297bfcc3a1630be181191a0553
-        with:
-          bootstrap_script: per_patch_perf.sh
-          path: ${{ env.WORKSPACE }}/csit
-          with_oper: true
+      #- name: Run CSIT Bootstrap
+      #  uses: fdio/csit/.github/actions/csit-bootstrap@6e2e8dd6eae1a9297bfcc3a1630be181191a0553
+      #  with:
+      #    bootstrap_script: per_patch_perf.sh
+      #    path: ${{ env.WORKSPACE }}/csit
+      #    with_oper: true
 
-      - name: AWS S3 Publish Logs
-        if: ${{ !cancelled() && (success() || failure()) }}
-        # yamllint disable-line rule:line-length
-        uses: fdio/.github/.github/actions/aws-s3-publish-logs@c2df5c7959a8415f7dd730315a40b058748b4c84
-        with:
-          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws_region: ${{ vars.AWS_REGION }}
-          s3_bucket: ${{ vars.S3_BUCKET }}
-          # yamllint disable-line rule:line-length
-          s3_path: vpp-csit-verify-perf-${{ matrix.node }}/${{ github.run_id }}
-          archives_path: ${{ env.CSIT_DIR }}/archives
+      #- name: AWS S3 Publish Logs
+      #  if: ${{ !cancelled() && (success() || failure()) }}
+      #  # yamllint disable-line rule:line-length
+      #  uses: fdio/.github/.github/actions/aws-s3-publish-logs@c2df5c7959a8415f7dd730315a40b058748b4c84
+      #  with:
+      #    aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #    aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #    aws_region: ${{ vars.AWS_REGION }}
+      #    s3_bucket: ${{ vars.S3_BUCKET }}
+      #    # yamllint disable-line rule:line-length
+      #    s3_path: vpp-csit-verify-perf-${{ matrix.node }}/${{ github.run_id }}
+      #    archives_path: ${{ env.CSIT_DIR }}/archives
 
-  vote:
-    if: ${{ always() }}
-    needs:
-      - notify-start
-      - vpp-csit-verify-handler
-    runs-on: ubuntu-latest
-    steps:
-      - uses: technote-space/workflow-conclusion-action@v3
-      - name: Set vote
-        uses: lfit/gerrit-review-action@v0.9
-        with:
-          host: ${{ vars.GERRIT_SERVER }}
-          username: ${{ vars.GERRIT_SSH_REQUIRED_USER }}
-          key: ${{ secrets.GERRIT_SSH_REQUIRED_PRIVKEY }}
-          known_hosts: ${{ vars.GERRIT_KNOWN_HOSTS }}
-          gerrit-change-number: ${{ github.event.inputs.GERRIT_CHANGE_NUMBER }}
-          gerrit-patchset-number: ${{ github.event.inputs.GERRIT_PATCHSET_NUMBER }}
-          vote-type: ${{ env.WORKFLOW_CONCLUSION }}
-          comment-only: true
+  #vote:
+  #  if: ${{ always() }}
+  #  needs:
+  #    - notify-start
+  #    - vpp-csit-verify-handler
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - uses: technote-space/workflow-conclusion-action@v3
+  #    - name: Set vote
+  #      uses: lfit/gerrit-review-action@v0.9
+  #      with:
+  #        host: ${{ vars.GERRIT_SERVER }}
+  #        username: ${{ vars.GERRIT_SSH_REQUIRED_USER }}
+  #        key: ${{ secrets.GERRIT_SSH_REQUIRED_PRIVKEY }}
+  #        known_hosts: ${{ vars.GERRIT_KNOWN_HOSTS }}
+  #        gerrit-change-number: ${{ github.event.inputs.GERRIT_CHANGE_NUMBER }}
+  #        gerrit-patchset-number: ${{ github.event.inputs.GERRIT_PATCHSET_NUMBER }}
+  #        vote-type: ${{ env.WORKFLOW_CONCLUSION }}
+  #        comment-only: true
